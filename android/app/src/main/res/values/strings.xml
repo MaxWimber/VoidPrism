@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoidPrism</string>
+    <string name="widget_calendar_name">VoidPrism · Календарь</string>
+    <string name="widget_calendar_description">Месяц с отмеченными днями, где есть задачи и события</string>
+    <string name="widget_tasks_name">VoidPrism · Задачи</string>
+    <string name="widget_tasks_description">Список задач на день, неделю или месяц</string>
+</resources>

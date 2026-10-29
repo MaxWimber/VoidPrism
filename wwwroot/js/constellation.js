@@ -1,0 +1,994 @@
+import { bridge } from "./bridge.js";
+import { aggregateChecklistProgress, checklistProgress, progressArc, progressBadgeHtml } from "./lists.js";
+import { getState, themesOf, update } from "./store.js";
+import { esc, formatDate, toneColor, toneFor, toast } from "./ui.js";
+
+const MAX_THEMES = 22;
+
+let root;
+let sky;
+let svg;
+let dossier;
+let legend;
+let zoomLabel;
+let active = false;
+/** @type {null | { type: 'theme', name: string } | { type: 'entry', id: string }} */
+let selected = null;
+let lastSize = "";
+let drag = null;
+let pan = null;
+let spaceDown = false;
+let composeRaf = 0;
+let composeFrom = null;
+let composeStart = 0;
+let redrawRaf = 0;
+let camTimer = 0;
+let cam = { x: 0, y: 0, z: 1 };
+let viewW = 800;
+let viewH = 600;
+
+function orbitMap() {
+  const map = getState().orbitMap;
+  return map && typeof map === "object" ? map : {};
+}
+
+function entryMap() {
+  const map = getState().entryMap;
+  return map && typeof map === "object" ? map : {};
+}
+
+function loadCamera() {
+  const saved = getState().orbitCamera;
+  if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) && Number.isFinite(saved.z)) {
+    cam = {
+      x: saved.x,
+      y: saved.y,
+      z: Math.min(2.6, Math.max(0.3, saved.z)),
+    };
+  } else {
+    cam = { x: 0, y: 0, z: 1 };
+  }
+}
+
+function persistCamera() {
+  clearTimeout(camTimer);
+  camTimer = setTimeout(() => {
+    update((state) => {
+      state.orbitCamera = { ...cam };
+      return state;
+    }, { silent: true });
+  }, 180);
+}
+
+function edgePoint(x, y, tx, ty, radius) {
+  const dx = tx - x;
+  const dy = ty - y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: x + (dx / len) * radius, y: y + (dy / len) * radius };
+}
+
+function centerOf(width, height) {
+  return { cx: width / 2, cy: height / 2 + 6 };
+}
+
+function ringSize(width, height) {
+  return {
+    rx: Math.max(120, Math.min(width * 0.3, 340)),
+    ry: Math.max(90, Math.min(height * 0.3, 230)),
+  };
+}
+
+function scaleOf(width, height) {
+  return Math.min(width, height);
+}
+
+function clampPos(x, y, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const lim = Math.max(width, height) * 2.6;
+  return {
+    x: Math.min(cx + lim, Math.max(cx - lim, x)),
+    y: Math.min(cy + lim, Math.max(cy - lim, y)),
+  };
+}
+
+function visibleEntries() {
+  return getState().entries.filter((entry) => entry.kind === "note" || entry.kind === "task");
+}
+
+function primaryTag(entry) {
+  return entry.tags?.length ? entry.tags[0] : "без темы";
+}
+
+function entryColor(entry) {
+  if (entry.kind === "task") return "#ffd27a";
+  return "#8ef0c8";
+}
+
+function entryRadius(entry) {
+  const progress = checklistProgress(entry.body);
+  if (progress) return 18;
+  return 15;
+}
+
+function short(text, max) {
+  const value = String(text);
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+function shownThemes() {
+  const { themes, pairs } = themesOf(getState().entries);
+  let shown = themes.slice(0, MAX_THEMES);
+  if (selected?.type === "theme" && !shown.some((theme) => theme.name === selected.name)) {
+    const extra = themes.find((theme) => theme.name === selected.name);
+    if (extra) shown = [...shown.slice(0, MAX_THEMES - 1), extra];
+  }
+  return { themes, pairs, shown };
+}
+
+function defaultThemes(themes, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const { rx, ry } = ringSize(width, height);
+  return themes.map((theme, index) => {
+    const angle = -Math.PI / 2 + (index / Math.max(themes.length, 1)) * Math.PI * 2;
+    const radius = Math.min(46, 24 + Math.sqrt(theme.count) * 9);
+    const pos = clampPos(
+      cx + Math.cos(angle) * rx,
+      cy + Math.sin(angle) * ry * 0.92,
+      width,
+      height,
+    );
+    return { ...theme, angle, radius, x: pos.x, y: pos.y };
+  });
+}
+
+function layoutThemes(themes, width, height, { saved = orbitMap(), overrides = null, targets = null, t = 1 } = {}) {
+  const { cx, cy } = centerOf(width, height);
+  const { rx, ry } = ringSize(width, height);
+  const scale = scaleOf(width, height);
+  const defaults = defaultThemes(themes, width, height);
+  const placed = defaults.map((theme) => {
+    let x = theme.x;
+    let y = theme.y;
+    const custom = saved[theme.name];
+    if (custom && Number.isFinite(custom.dx) && Number.isFinite(custom.dy)) {
+      x = cx + custom.dx * scale;
+      y = cy + custom.dy * scale;
+    }
+    if (targets && composeFrom?.themes?.[theme.name]) {
+      const from = composeFrom.themes[theme.name];
+      const to = targets.get(theme.name) || theme;
+      x = from.x + (to.x - from.x) * t;
+      y = from.y + (to.y - from.y) * t;
+    }
+    if (overrides?.kind === "theme" && overrides.id === theme.name) {
+      x = overrides.x;
+      y = overrides.y;
+    }
+    const pos = clampPos(x, y, width, height);
+    return {
+      ...theme,
+      x: pos.x,
+      y: pos.y,
+      angle: Math.atan2(pos.y - cy, pos.x - cx),
+    };
+  });
+  return { cx, cy, rx, ry, placed };
+}
+
+function defaultEntries(entries, themePlaced, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const { rx, ry } = ringSize(width, height);
+  const byTheme = new Map();
+  for (const entry of entries) {
+    const tag = primaryTag(entry);
+    if (!byTheme.has(tag)) byTheme.set(tag, []);
+    byTheme.get(tag).push(entry);
+  }
+  const themeByName = new Map(themePlaced.map((theme) => [theme.name, theme]));
+  const placed = [];
+
+  for (const [tag, group] of byTheme) {
+    const theme = themeByName.get(tag);
+    group.forEach((entry, index) => {
+      const radius = entryRadius(entry);
+      let x;
+      let y;
+      let angle;
+      if (theme) {
+        const spread = Math.min(1.1, 0.22 * Math.max(group.length - 1, 1));
+        angle = theme.angle + (index - (group.length - 1) / 2) * (spread / Math.max(group.length - 1, 1) || 0);
+        if (group.length === 1) angle = theme.angle;
+        else angle = theme.angle + (index - (group.length - 1) / 2) * Math.min(0.35, 1.4 / group.length);
+        const dist = theme.radius + 52 + Math.min(group.length, 8) * 2;
+        x = theme.x + Math.cos(angle) * dist;
+        y = theme.y + Math.sin(angle) * dist * 0.92;
+      } else {
+        angle = -Math.PI / 2 + (placed.length / Math.max(entries.length, 1)) * Math.PI * 2;
+        x = cx + Math.cos(angle) * rx * 1.55;
+        y = cy + Math.sin(angle) * ry * 1.4;
+      }
+      const pos = clampPos(x, y, width, height);
+      placed.push({
+        ...entry,
+        radius,
+        x: pos.x,
+        y: pos.y,
+        angle: Math.atan2(pos.y - cy, pos.x - cx),
+        homeTag: tag,
+      });
+    });
+  }
+  return placed;
+}
+
+function layoutEntries(entries, themePlaced, width, height, { saved = entryMap(), overrides = null, targets = null, t = 1 } = {}) {
+  const { cx, cy } = centerOf(width, height);
+  const scale = scaleOf(width, height);
+  const defaults = defaultEntries(entries, themePlaced, width, height);
+  return defaults.map((entry) => {
+    let x = entry.x;
+    let y = entry.y;
+    const custom = saved[entry.id];
+    if (custom && Number.isFinite(custom.dx) && Number.isFinite(custom.dy)) {
+      x = cx + custom.dx * scale;
+      y = cy + custom.dy * scale;
+    }
+    if (targets && composeFrom?.entries?.[entry.id]) {
+      const from = composeFrom.entries[entry.id];
+      const to = targets.get(entry.id) || entry;
+      x = from.x + (to.x - from.x) * t;
+      y = from.y + (to.y - from.y) * t;
+    }
+    if (overrides?.kind === "entry" && overrides.id === entry.id) {
+      x = overrides.x;
+      y = overrides.y;
+    }
+    const pos = clampPos(x, y, width, height);
+    return {
+      ...entry,
+      x: pos.x,
+      y: pos.y,
+      angle: Math.atan2(pos.y - cy, pos.x - cx),
+    };
+  });
+}
+
+function pointerToWorld(event) {
+  const rect = svg.getBoundingClientRect();
+  const sx = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * viewW;
+  const sy = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * viewH;
+  return {
+    x: cam.x + sx / cam.z,
+    y: cam.y + sy / cam.z,
+  };
+}
+
+function applyCamera() {
+  const world = svg.querySelector(".sky-world");
+  if (world) {
+    world.setAttribute("transform", `translate(${-cam.x * cam.z} ${-cam.y * cam.z}) scale(${cam.z})`);
+  }
+  if (zoomLabel) zoomLabel.textContent = `${Math.round(cam.z * 100)}%`;
+}
+
+function saveThemePosition(name, x, y, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const scale = scaleOf(width, height) || 1;
+  update((state) => {
+    state.orbitMap = { ...(state.orbitMap || {}) };
+    state.orbitMap[name] = { dx: (x - cx) / scale, dy: (y - cy) / scale };
+    return state;
+  }, { silent: true });
+}
+
+function saveEntryPosition(id, x, y, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const scale = scaleOf(width, height) || 1;
+  update((state) => {
+    state.entryMap = { ...(state.entryMap || {}) };
+    state.entryMap[id] = { dx: (x - cx) / scale, dy: (y - cy) / scale };
+    return state;
+  }, { silent: true });
+}
+
+function fitCamera(geo, width, height, animate = false) {
+  let minX = geo.cx - 90;
+  let minY = geo.cy - 90;
+  let maxX = geo.cx + 90;
+  let maxY = geo.cy + 90;
+  for (const theme of geo.placed) {
+    minX = Math.min(minX, theme.x - theme.radius - 28);
+    minY = Math.min(minY, theme.y - theme.radius - 28);
+    maxX = Math.max(maxX, theme.x + theme.radius + 28);
+    maxY = Math.max(maxY, theme.y + theme.radius + 36);
+  }
+  for (const entry of geo.entries || []) {
+    minX = Math.min(minX, entry.x - entry.radius - 20);
+    minY = Math.min(minY, entry.y - entry.radius - 20);
+    maxX = Math.max(maxX, entry.x + entry.radius + 20);
+    maxY = Math.max(maxY, entry.y + entry.radius + 28);
+  }
+  const pad = 48;
+  const boxW = Math.max(120, maxX - minX);
+  const boxH = Math.max(120, maxY - minY);
+  const nextZ = Math.min((width - pad * 2) / boxW, (height - pad * 2) / boxH, 1.6);
+  const z = Math.max(0.3, nextZ);
+  const next = {
+    z,
+    x: minX - (width / z - boxW) / 2,
+    y: minY - (height / z - boxH) / 2,
+  };
+  if (!animate) {
+    cam = next;
+    applyCamera();
+    persistCamera();
+    return;
+  }
+  const from = { ...cam };
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / 420);
+    const e = 1 - (1 - t) ** 3;
+    cam = {
+      x: from.x + (next.x - from.x) * e,
+      y: from.y + (next.y - from.y) * e,
+      z: from.z + (next.z - from.z) * e,
+    };
+    applyCamera();
+    if (t < 1) requestAnimationFrame(step);
+    else persistCamera();
+  };
+  requestAnimationFrame(step);
+}
+
+function zoomAt(clientX, clientY, factor) {
+  const rect = svg.getBoundingClientRect();
+  const sx = ((clientX - rect.left) / Math.max(rect.width, 1)) * viewW;
+  const sy = ((clientY - rect.top) / Math.max(rect.height, 1)) * viewH;
+  const wx = cam.x + sx / cam.z;
+  const wy = cam.y + sy / cam.z;
+  cam.z = Math.min(2.6, Math.max(0.3, cam.z * factor));
+  cam.x = wx - sx / cam.z;
+  cam.y = wy - sy / cam.z;
+  applyCamera();
+  persistCamera();
+}
+
+function relatedNames(name, pairs) {
+  const found = [];
+  for (const [key, weight] of pairs) {
+    const [left, right] = key.split("\u0000");
+    if (left === name) found.push([right, weight]);
+    if (right === name) found.push([left, weight]);
+  }
+  return found.sort((a, b) => b[1] - a[1]).slice(0, 4);
+}
+
+function drawSky(options = {}) {
+  const rect = sky.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  if (width < 40 || height < 40) return null;
+  viewW = width;
+  viewH = height;
+
+  const { themes, pairs, shown } = shownThemes();
+  const entries = visibleEntries();
+  const geo = layoutThemes(shown, width, height, {
+    saved: options.savedThemes ?? (options.targets ? {} : orbitMap()),
+    overrides: options.overrides,
+    targets: options.themeTargets,
+    t: options.t ?? 1,
+  });
+  const placedEntries = layoutEntries(entries, geo.placed, width, height, {
+    saved: options.savedEntries ?? (options.entryTargets ? {} : entryMap()),
+    overrides: options.overrides,
+    targets: options.entryTargets,
+    t: options.t ?? 1,
+  });
+  geo.entries = placedEntries;
+
+  const byName = new Map(geo.placed.map((theme) => [theme.name, theme]));
+  const profile = getState().profile;
+  const selectedTheme = selected?.type === "theme" ? selected.name : null;
+  const selectedEntry = selected?.type === "entry" ? selected.id : null;
+  const selectedEntryObj = selectedEntry
+    ? placedEntries.find((entry) => entry.id === selectedEntry) || entries.find((entry) => entry.id === selectedEntry)
+    : null;
+  const highlightTags = selectedEntryObj
+    ? new Set(selectedEntryObj.tags?.length ? selectedEntryObj.tags : ["без темы"])
+    : null;
+
+  const chords = [...pairs.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 18)
+    .map(([key, weight]) => {
+      const [left, right] = key.split("\u0000");
+      const a = byName.get(left);
+      const b = byName.get(right);
+      if (!a || !b) return "";
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const dx = mx - geo.cx;
+      const dy = my - geo.cy;
+      const len = Math.hypot(dx, dy) || 1;
+      const cpx = mx + (dx / len) * 28;
+      const cpy = my + (dy / len) * 28;
+      let dim = 0.55 + Math.min(weight, 3) * 0.12;
+      if (selectedTheme && selectedTheme !== a.name && selectedTheme !== b.name) dim = 0.14;
+      if (highlightTags && !highlightTags.has(a.name) && !highlightTags.has(b.name)) dim = 0.14;
+      return `<path class="chord" d="M ${a.x} ${a.y} Q ${cpx} ${cpy} ${b.x} ${b.y}" opacity="${dim}" />`;
+    })
+    .join("");
+
+  const themeSpokes = geo.placed.map((theme) => {
+    const from = edgePoint(geo.cx, geo.cy, theme.x, theme.y, 62);
+    const to = edgePoint(theme.x, theme.y, geo.cx, geo.cy, theme.radius + 2);
+    let dim = 0.85;
+    if (selectedTheme && selectedTheme !== theme.name) dim = 0.16;
+    if (highlightTags && !highlightTags.has(theme.name)) dim = 0.16;
+    return `<path class="spoke" d="M ${from.x} ${from.y} L ${to.x} ${to.y}" opacity="${dim}" />`;
+  }).join("");
+
+  const entryLinks = placedEntries.map((entry) => {
+    const theme = byName.get(entry.homeTag);
+    const target = theme || { x: geo.cx, y: geo.cy, radius: 58 };
+    const from = edgePoint(target.x, target.y, entry.x, entry.y, (target.radius || 58) + 2);
+    const to = edgePoint(entry.x, entry.y, target.x, target.y, entry.radius + 1);
+    let dim = 0.42;
+    if (selectedTheme && entry.homeTag !== selectedTheme && !(entry.tags || []).includes(selectedTheme)) dim = 0.1;
+    if (selectedEntry && entry.id !== selectedEntry) dim = 0.12;
+    if (selectedEntry && entry.id === selectedEntry) dim = 0.85;
+    return `<path class="entry-link" d="M ${from.x} ${from.y} L ${to.x} ${to.y}" opacity="${dim}" />`;
+  }).join("");
+
+  const font = geo.placed.length > 14 ? 11 : 13;
+  const nodes = geo.placed.map((theme, index) => {
+    const color = theme.name === "без темы" ? "#93a0c4" : toneColor(toneFor(theme.name));
+    const dim = (selectedTheme && selectedTheme !== theme.name)
+      || (highlightTags && !highlightTags.has(theme.name))
+      ? "is-dim"
+      : "";
+    const dragging = options.overrides?.kind === "theme" && options.overrides.id === theme.name ? "is-dragging" : "";
+    const delay = `${(index % 8) * 0.12}s`;
+    const progress = aggregateChecklistProgress(theme.entries);
+    const ringR = theme.radius + 7;
+    const progressRing = progress
+      ? `<g class="orbit-progress ${progress.percent >= 100 ? "is-complete" : ""}">${progressArc(theme.x, theme.y, ringR, progress.percent, { width: 3.2, className: "orbit-arc" })}</g>`
+      : "";
+    const progressLabel = progress && theme.radius >= 28
+      ? `<text class="orbit-progress-label" x="${theme.x}" y="${theme.y + 5}" text-anchor="middle" font-size="11">${progress.percent}%</text>`
+      : "";
+    const tip = progress
+      ? `${theme.name} · ${theme.count} · чеклист ${progress.percent}%`
+      : `${theme.name} · ${theme.count}`;
+    return `
+      <g class="theme ${dim} ${dragging} ${progress ? "has-progress" : ""}" data-theme="${esc(theme.name)}" style="color:${color}; --drift-delay:${delay}">
+        ${progressRing}
+        <circle class="theme-dot" cx="${theme.x}" cy="${theme.y}" r="${theme.radius}" />
+        ${progressLabel}
+        <text class="theme-label" x="${theme.x}" y="${theme.y + theme.radius + 18}" font-size="${font}">${esc(short(theme.name, 18))}</text>
+        <title>${esc(tip)}</title>
+      </g>`;
+  }).join("");
+
+  const showLabels = placedEntries.length <= 28;
+  const stars = placedEntries.map((entry, index) => {
+    const color = entryColor(entry);
+    const related = selectedTheme
+      && (entry.homeTag === selectedTheme || (entry.tags || []).includes(selectedTheme));
+    const dim = (selectedTheme && !related) || (selectedEntry && entry.id !== selectedEntry) ? "is-dim" : "";
+    const dragging = options.overrides?.kind === "entry" && options.overrides.id === entry.id ? "is-dragging" : "";
+    const progress = checklistProgress(entry.body);
+    const moonRing = progress
+      ? `<g class="moon-progress ${progress.percent >= 100 ? "is-complete" : ""}">${progressArc(entry.x, entry.y, entry.radius + 6, progress.percent, { width: 2.4, className: "moon-arc" })}</g>`
+      : "";
+    const tip = progress
+      ? `${entry.title} · ${progress.percent}% (${progress.done}/${progress.total})`
+      : `${entry.title} · ${entry.kind === "task" ? "задача" : "заметка"}`;
+    const delay = `${(index % 10) * 0.08}s`;
+    return `
+      <g class="star ${dim} ${dragging} ${progress ? "has-progress" : ""}" data-entry="${esc(entry.id)}" style="color:${color}; --drift-delay:${delay}">
+        ${moonRing}
+        <circle class="star-dot" cx="${entry.x}" cy="${entry.y}" r="${entry.radius}" />
+        ${progress ? `<text class="moon-progress-label" x="${entry.x}" y="${entry.y + 4}" text-anchor="middle" font-size="9">${progress.percent}</text>` : ""}
+        ${showLabels ? `<text class="star-label" x="${entry.x}" y="${entry.y + entry.radius + 14}" font-size="10">${esc(short(entry.title, 14))}</text>` : ""}
+        <title>${esc(tip)}</title>
+      </g>`;
+  }).join("");
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.classList.toggle("is-live", !options.overrides && !options.themeTargets && !pan);
+  svg.innerHTML = `
+    <rect class="sky-hit" width="${width}" height="${height}" fill="transparent"></rect>
+    <g class="sky-world">
+      <ellipse class="guide" cx="${geo.cx}" cy="${geo.cy}" rx="${geo.rx}" ry="${geo.ry * 0.92}"></ellipse>
+      ${chords}
+      ${themeSpokes}
+      ${entryLinks}
+      ${nodes}
+      ${stars}
+      <g class="core" data-action="core">
+        <circle class="core-ring" cx="${geo.cx}" cy="${geo.cy}" r="74"></circle>
+        <circle class="core-bg" cx="${geo.cx}" cy="${geo.cy}" r="58"></circle>
+        <foreignObject x="${geo.cx - 70}" y="${geo.cy - 36}" width="140" height="72">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="core-face">
+            <strong>${esc(profile.name || "Я")}</strong>
+            <span>${esc(profile.epithet || "")}</span>
+          </div>
+        </foreignObject>
+      </g>
+    </g>`;
+  applyCamera();
+
+  legend.textContent = entries.length
+    ? "Орбиты — метки, звёзды — заметки и задачи. Всё можно двигать. Пробел — панорама."
+    : "Добавьте заметку или задачу — она появится на созвездии.";
+
+  return { width, height, geo, shown, entries: placedEntries };
+}
+
+function drawDossier() {
+  const activeEl = document.activeElement;
+  if (dossier.contains(activeEl) && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) return;
+  const state = getState();
+  const { themes, pairs } = themesOf(state.entries);
+  const entries = visibleEntries();
+  const hidden = Math.max(0, themes.length - MAX_THEMES);
+
+  if (selected?.type === "entry") {
+    const entry = entries.find((item) => item.id === selected.id) || state.entries.find((item) => item.id === selected.id);
+    if (!entry) {
+      selected = null;
+    } else {
+      const progress = checklistProgress(entry.body);
+      dossier.innerHTML = `
+        <button type="button" class="back" data-back>Космос</button>
+        <p class="eyebrow">${entry.kind === "task" ? "Задача" : "Заметка"}</p>
+        <h2>${esc(entry.title)}</h2>
+        <p class="hint">${esc(formatDate(entry.updatedAt))}${entry.tags?.length ? ` · ${entry.tags.map((tag) => `#${tag}`).join(" ")}` : ""}</p>
+        ${progress ? progressBadgeHtml(progress) : ""}
+        <p class="lede">${esc(short(entry.body.replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>
+        <div class="dossier-actions">
+          <button type="button" class="btn slim" data-open="${esc(entry.id)}">Открыть</button>
+          ${entry.tags?.[0] ? `<button type="button" class="btn ghost slim" data-pick="${esc(entry.tags[0])}">К орбите</button>` : ""}
+        </div>`;
+      return;
+    }
+  }
+
+  if (!selected || selected.type !== "theme" || !themes.some((theme) => theme.name === selected.name)) {
+    const openTasks = state.entries.filter((entry) => entry.kind === "task" && entry.status !== "done").length;
+    const openWishes = state.entries.filter((entry) => entry.kind === "wish" && entry.status !== "done").length;
+    dossier.innerHTML = `
+      <p class="eyebrow">Карта личности</p>
+      <h2>${esc(state.profile.name || "Я")}</h2>
+      <label>Имя в центре</label>
+      <input class="text-input identity-name" maxlength="32" value="${esc(state.profile.name)}" />
+      <label>Короткая подпись</label>
+      <input class="text-input identity-epithet" maxlength="80" value="${esc(state.profile.epithet)}" />
+      <div class="stats stats-four">
+        <div class="stat"><b>${entries.length}</b><span>на карте</span></div>
+        <div class="stat"><b>${themes.filter((theme) => theme.name !== "без темы").length}</b><span>орбит</span></div>
+        <div class="stat"><b>${openTasks}</b><span>задач</span></div>
+        <div class="stat"><b>${openWishes}</b><span>желаний</span></div>
+      </div>
+      <p class="lede">Каждая заметка и задача — звезда. Орбиты-метки и звёзды можно расставить руками.</p>
+      <div class="orbit-list">
+        ${themes.map((theme) => {
+          const progress = aggregateChecklistProgress(theme.entries);
+          return `<button type="button" data-pick="${esc(theme.name)}"><b>${esc(theme.name)}</b> <small>${theme.count}${progress ? ` · ${progress.percent}%` : ""}</small></button>`;
+        }).join("") || "<p>Пока нет ни одной орбиты.</p>"}
+      </div>
+      ${hidden ? `<p class="hint">На небе видны ${MAX_THEMES} самых частых меток. Остальные ${hidden} — в этом списке.</p>` : ""}`;
+    return;
+  }
+
+  const theme = themes.find((item) => item.name === selected.name);
+  const links = relatedNames(theme.name, pairs);
+  const themeProgress = aggregateChecklistProgress(theme.entries);
+  const themeEntries = theme.entries.filter((entry) => entry.kind === "note" || entry.kind === "task");
+  dossier.innerHTML = `
+    <button type="button" class="back" data-back>Все орбиты</button>
+    <p class="eyebrow">Орбита</p>
+    <h2>${esc(theme.name)}</h2>
+    <p class="lede">${themeEntries.length} ${themeEntries.length === 1 ? "запись на этой орбите" : "записей на этой орбите"}.</p>
+    ${themeProgress ? progressBadgeHtml(themeProgress) : ""}
+    ${links.length ? `<p class="hint">Рядом: ${links.map(([name]) => esc(name)).join(", ")}</p>` : ""}
+    <div class="orbit-list">
+      ${themeEntries.map((entry) => {
+        const progress = checklistProgress(entry.body);
+        return `
+        <button type="button" class="entry-row" data-select-entry="${esc(entry.id)}">
+          <small>${entry.kind === "task" ? "Задача" : "Заметка"}${entry.status === "focus" ? " · в фокусе" : ""}${progress ? ` · ${progress.percent}%` : ""}</small>
+          <b>${esc(entry.title)}</b>
+          ${progress ? `<span class="entry-progress-bar" aria-hidden="true"><i style="width:${progress.percent}%"></i></span>` : ""}
+        </button>`;
+      }).join("") || "<p>На орбите пока нет заметок и задач.</p>"}
+    </div>
+    <div class="dossier-actions">
+      <button type="button" class="btn slim" data-new>Запись на эту орбиту</button>
+      <button type="button" class="btn ghost slim" data-filter>Показать в архиве</button>
+    </div>`;
+}
+
+function bindIdentity() {
+  const name = dossier.querySelector(".identity-name");
+  const epithet = dossier.querySelector(".identity-epithet");
+  if (!name || !epithet) return;
+  const save = () => {
+    const nextName = name.value.trim() || "Я";
+    const nextEpithet = epithet.value.trim();
+    const profile = getState().profile;
+    if (nextName === profile.name && nextEpithet === profile.epithet) return;
+    update((state) => {
+      state.profile.name = nextName;
+      state.profile.epithet = nextEpithet;
+      return state;
+    });
+  };
+  name.addEventListener("change", save);
+  epithet.addEventListener("change", save);
+  name.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      epithet.focus();
+    }
+  });
+}
+
+function scheduleDragDraw() {
+  if (redrawRaf) return;
+  redrawRaf = requestAnimationFrame(() => {
+    redrawRaf = 0;
+    if (!drag) return;
+    drawSky({ overrides: drag });
+  });
+}
+
+function compose() {
+  const rect = sky.getBoundingClientRect();
+  const { shown } = shownThemes();
+  const entries = visibleEntries();
+  const currentThemes = layoutThemes(shown, rect.width, rect.height, { saved: orbitMap() });
+  const currentEntries = layoutEntries(entries, currentThemes.placed, rect.width, rect.height, { saved: entryMap() });
+  composeFrom = {
+    themes: Object.fromEntries(currentThemes.placed.map((theme) => [theme.name, { x: theme.x, y: theme.y }])),
+    entries: Object.fromEntries(currentEntries.map((entry) => [entry.id, { x: entry.x, y: entry.y }])),
+  };
+  const themeTargets = new Map(defaultThemes(shown, rect.width, rect.height).map((theme) => [theme.name, theme]));
+  const entryTargets = new Map(
+    defaultEntries(entries, [...themeTargets.values()], rect.width, rect.height).map((entry) => [entry.id, entry]),
+  );
+
+  update((state) => {
+    state.orbitMap = {};
+    state.entryMap = {};
+    return state;
+  }, { silent: true });
+
+  if (composeRaf) cancelAnimationFrame(composeRaf);
+  composeStart = performance.now();
+  sky.classList.add("is-composing");
+
+  const step = (now) => {
+    const t = Math.min(1, (now - composeStart) / 560);
+    const eased = 1 - (1 - t) ** 3;
+    const drawn = drawSky({
+      savedThemes: {},
+      savedEntries: {},
+      themeTargets,
+      entryTargets,
+      t: eased,
+    });
+    if (t < 1) {
+      composeRaf = requestAnimationFrame(step);
+      return;
+    }
+    composeRaf = 0;
+    composeFrom = null;
+    sky.classList.remove("is-composing");
+    if (drawn) fitCamera(drawn.geo, drawn.width, drawn.height, true);
+    else drawSky();
+  };
+  composeRaf = requestAnimationFrame(step);
+  toast("Созвездие собрано");
+}
+
+function fitView() {
+  const drawn = drawSky();
+  if (drawn) fitCamera(drawn.geo, drawn.width, drawn.height, true);
+}
+
+export function render() {
+  if (!active || drag || pan) return;
+  const rect = sky.getBoundingClientRect();
+  if (rect.width < 40 || rect.height < 40) {
+    requestAnimationFrame(() => {
+      if (active) render();
+    });
+    return;
+  }
+  lastSize = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+  drawSky();
+  drawDossier();
+  bindIdentity();
+}
+
+export function mount(parent) {
+  root = document.createElement("section");
+  root.className = "view constellation-view";
+  root.innerHTML = `
+    <div class="constellation-layout">
+      <div class="sky">
+        <div class="sky-tools">
+          <button type="button" class="mini sky-zoom" data-zoom="out" aria-label="Мельче">−</button>
+          <span class="zoom-label sky-zoom-label">100%</span>
+          <button type="button" class="mini sky-zoom" data-zoom="in" aria-label="Крупнее">+</button>
+          <button type="button" class="btn ghost slim" data-fit title="Показать всё созвездие">Вписать</button>
+          <button type="button" class="btn slim" data-compose title="Собрать орбиты и звёзды">Компоновать</button>
+        </div>
+        <svg aria-label="Созвездие личности"></svg>
+        <p class="legend"></p>
+      </div>
+      <aside class="dossier"></aside>
+    </div>`;
+  parent.append(root);
+  sky = root.querySelector(".sky");
+  svg = root.querySelector("svg");
+  dossier = root.querySelector(".dossier");
+  legend = root.querySelector(".legend");
+  zoomLabel = root.querySelector(".sky-zoom-label");
+
+  root.querySelector(".sky-tools").addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (event.target.closest("[data-compose]")) {
+      compose();
+      return;
+    }
+    if (event.target.closest("[data-fit]")) {
+      fitView();
+      return;
+    }
+    const zoom = event.target.closest("[data-zoom]")?.dataset.zoom;
+    if (zoom) {
+      const box = svg.getBoundingClientRect();
+      zoomAt(box.left + box.width / 2, box.top + box.height / 2, zoom === "in" ? 1.12 : 1 / 1.12);
+    }
+  });
+
+  const startPan = (event, immediate = false) => {
+    pan = {
+      x: event.clientX,
+      y: event.clientY,
+      cx: cam.x,
+      cy: cam.y,
+      pointerId: event.pointerId,
+      moved: false,
+      armed: immediate,
+    };
+    if (immediate) {
+      sky.classList.add("is-panning");
+      svg.classList.remove("is-live");
+    }
+    svg.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  const beginDrag = (event, kind, id, circle) => {
+    const point = pointerToWorld(event);
+    const x = Number(circle.getAttribute("cx"));
+    const y = Number(circle.getAttribute("cy"));
+    drag = {
+      kind,
+      id,
+      x,
+      y,
+      offsetX: point.x - x,
+      offsetY: point.y - y,
+      moved: false,
+      pointerId: event.pointerId,
+    };
+    sky.classList.add("is-dragging");
+    svg.classList.remove("is-live");
+    svg.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  svg.addEventListener("pointerdown", (event) => {
+    const onTheme = event.target.closest("[data-theme]");
+    const onStar = event.target.closest("[data-entry]");
+    const onCore = event.target.closest(".core");
+
+    if (event.button === 1 || (spaceDown && event.button === 0 && !onTheme && !onStar)) {
+      startPan(event, true);
+      return;
+    }
+
+    if (event.button === 0 && !onTheme && !onStar && !onCore && !spaceDown) {
+      startPan(event, false);
+      return;
+    }
+
+    if (event.button !== 0 || spaceDown) return;
+
+    if (onTheme) {
+      beginDrag(event, "theme", onTheme.dataset.theme, onTheme.querySelector(".theme-dot"));
+      return;
+    }
+    if (onStar) {
+      beginDrag(event, "entry", onStar.dataset.entry, onStar.querySelector(".star-dot"));
+    }
+  });
+
+  svg.addEventListener("pointermove", (event) => {
+    if (pan && event.pointerId === pan.pointerId) {
+      const dist = Math.hypot(event.clientX - pan.x, event.clientY - pan.y);
+      if (!pan.armed && dist < 4) return;
+      if (!pan.armed) {
+        pan.armed = true;
+        pan.moved = true;
+        sky.classList.add("is-panning");
+        svg.classList.remove("is-live");
+      } else if (dist >= 4) {
+        pan.moved = true;
+      }
+      cam.x = pan.cx - (event.clientX - pan.x) / cam.z;
+      cam.y = pan.cy - (event.clientY - pan.y) / cam.z;
+      applyCamera();
+      return;
+    }
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const point = pointerToWorld(event);
+    const nextX = point.x - drag.offsetX;
+    const nextY = point.y - drag.offsetY;
+    if (!drag.moved && Math.hypot(nextX - drag.x, nextY - drag.y) < 3) return;
+    drag.moved = true;
+    drag.x = nextX;
+    drag.y = nextY;
+    scheduleDragDraw();
+  });
+
+  const endPointer = (event) => {
+    if (pan && (!event || event.pointerId === pan.pointerId)) {
+      const finished = pan;
+      pan = null;
+      sky.classList.remove("is-panning");
+      if (finished.moved) {
+        persistCamera();
+        drawSky();
+      } else if (!spaceDown) {
+        selected = null;
+        render();
+      } else {
+        drawSky();
+      }
+      return;
+    }
+    if (!drag || (event && event.pointerId !== drag.pointerId)) return;
+    const finished = drag;
+    drag = null;
+    sky.classList.remove("is-dragging");
+    const rect = sky.getBoundingClientRect();
+    if (finished.moved) {
+      const pos = clampPos(finished.x, finished.y, rect.width, rect.height);
+      if (finished.kind === "theme") {
+        saveThemePosition(finished.id, pos.x, pos.y, rect.width, rect.height);
+        selected = { type: "theme", name: finished.id };
+      } else {
+        saveEntryPosition(finished.id, pos.x, pos.y, rect.width, rect.height);
+        selected = { type: "entry", id: finished.id };
+      }
+      drawSky();
+      drawDossier();
+      bindIdentity();
+    } else if (finished.kind === "theme") {
+      selected = { type: "theme", name: finished.id };
+      render();
+    } else {
+      selected = { type: "entry", id: finished.id };
+      render();
+    }
+  };
+
+  svg.addEventListener("pointerup", endPointer);
+  svg.addEventListener("pointercancel", endPointer);
+
+  svg.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.08 : 1 / 1.08);
+  }, { passive: false });
+
+  svg.addEventListener("dblclick", (event) => {
+    const entryId = event.target.closest("[data-entry]")?.dataset.entry;
+    if (entryId) {
+      event.preventDefault();
+      bridge.openEntry?.(entryId);
+    }
+  });
+
+  svg.addEventListener("click", (event) => {
+    if (spaceDown) return;
+    if (event.target.closest("[data-theme]") || event.target.closest("[data-entry]")) return;
+    if (event.target.closest("[data-action='core']")) {
+      selected = null;
+      render();
+      dossier.querySelector(".identity-name")?.focus();
+    }
+  });
+
+  dossier.addEventListener("click", (event) => {
+    if (event.target.closest("[data-back]")) {
+      selected = null;
+      render();
+      return;
+    }
+    const pick = event.target.closest("[data-pick]")?.dataset.pick;
+    if (pick) {
+      selected = { type: "theme", name: pick };
+      render();
+      return;
+    }
+    const selectEntry = event.target.closest("[data-select-entry]")?.dataset.selectEntry;
+    if (selectEntry) {
+      selected = { type: "entry", id: selectEntry };
+      render();
+      return;
+    }
+    const open = event.target.closest("[data-open]")?.dataset.open;
+    if (open) bridge.openEntry?.(open);
+    if (event.target.closest("[data-new]") && selected?.type === "theme") {
+      bridge.newEntry?.({ tags: [selected.name] });
+    }
+    if (event.target.closest("[data-filter]") && selected?.type === "theme") {
+      bridge.filterTag?.(selected.name);
+    }
+  });
+
+  const observer = new ResizeObserver(() => {
+    if (!active || drag || pan) return;
+    const box = sky.getBoundingClientRect();
+    const size = `${Math.round(box.width)}x${Math.round(box.height)}`;
+    if (size === lastSize) return;
+    render();
+  });
+  observer.observe(sky);
+}
+
+export function setActive(on) {
+  active = on;
+  root.classList.toggle("is-on", on);
+  if (on) {
+    loadCamera();
+    render();
+  } else {
+    drag = null;
+    pan = null;
+    spaceDown = false;
+    sky?.classList.remove("is-space", "is-panning", "is-dragging");
+    if (composeRaf) cancelAnimationFrame(composeRaf);
+    composeRaf = 0;
+    composeFrom = null;
+  }
+}
+
+export function focusTheme(name) {
+  selected = name ? { type: "theme", name } : null;
+  if (active) render();
+}
+
+export function keydown(event) {
+  if (!active) return;
+  if (event.code === "Space") {
+    event.preventDefault();
+    spaceDown = true;
+    sky.classList.add("is-space");
+  }
+}
+
+export function keyup(event) {
+  if (event.code === "Space") {
+    spaceDown = false;
+    sky?.classList.remove("is-space");
+  }
+}

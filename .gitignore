@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+*.user
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+db.sqlite3
+*.sqlite3

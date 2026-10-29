@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_tasks_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_tasks_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Задачи"
+            android:textColor="#EEF2FF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_tasks_add"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_day_today"
+            android:contentDescription="Новая задача на сегодня"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#071018"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_tasks_range"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Сегодня"
+        android:textColor="#7EE7FF"
+        android:textSize="11sp" />
+
+    <LinearLayout
+        android:id="@+id/widget_tasks_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView android:id="@+id/task0" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task1" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task2" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task3" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task4" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task5" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task6" style="@style/WidgetTaskLine" />
+        <TextView android:id="@+id/task7" style="@style/WidgetTaskLine" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_tasks_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Нет задач на этот срок"
+        android:textColor="#6D789C"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

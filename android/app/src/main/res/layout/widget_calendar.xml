@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_calendar_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:id="@+id/widget_cal_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Календарь"
+        android:textColor="#EEF2FF"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_cal_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="VoidPrism"
+        android:textColor="#93A0C4"
+        android:textSize="11sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+        <TextView style="@style/WidgetDayHead" android:text="пн" />
+        <TextView style="@style/WidgetDayHead" android:text="вт" />
+        <TextView style="@style/WidgetDayHead" android:text="ср" />
+        <TextView style="@style/WidgetDayHead" android:text="чт" />
+        <TextView style="@style/WidgetDayHead" android:text="пт" />
+        <TextView style="@style/WidgetDayHead" android:text="сб" />
+        <TextView style="@style/WidgetDayHead" android:text="вс" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/widget_cal_week0" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d00" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d01" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d02" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d03" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d04" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d05" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d06" style="@style/WidgetDayCell" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_cal_week1" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d10" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d11" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d12" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d13" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d14" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d15" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d16" style="@style/WidgetDayCell" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_cal_week2" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d20" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d21" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d22" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d23" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d24" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d25" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d26" style="@style/WidgetDayCell" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_cal_week3" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d30" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d31" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d32" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d33" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d34" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d35" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d36" style="@style/WidgetDayCell" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_cal_week4" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d40" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d41" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d42" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d43" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d44" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d45" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d46" style="@style/WidgetDayCell" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_cal_week5" style="@style/WidgetWeekRow">
+        <TextView android:id="@+id/d50" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d51" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d52" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d53" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d54" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d55" style="@style/WidgetDayCell" />
+        <TextView android:id="@+id/d56" style="@style/WidgetDayCell" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_cal_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="• день с планом"
+        android:textColor="#6D789C"
+        android:textSize="10sp" />
+</LinearLayout>
