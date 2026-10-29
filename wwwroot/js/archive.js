@@ -1603,9 +1603,7 @@ export function mount(parent) {
     <header class="view-head">
       <h1>Архив</h1>
     </header>
-    <button type="button" class="fab" data-new title="Новая запись (N)" aria-label="Новая запись">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-    </button>
+    <button type="button" class="fab" data-new title="Новая запись (N)" aria-label="Новая запись">${icons.plus}</button>
     <div class="welcome">
       <p>Стартовая вселенная уже размечена. Перепишите записи под себя или очистите их в профиле — созвездие соберётся заново из ваших меток.</p>
       <button type="button" class="btn ghost slim" data-dismiss>Понятно</button>

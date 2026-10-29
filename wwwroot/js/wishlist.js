@@ -22,7 +22,6 @@ const FILTERS = [
 let root;
 let listEl;
 let filterEl;
-let statsEl;
 let active = false;
 let filter = "alive";
 
@@ -74,27 +73,22 @@ function cardHtml(entry) {
     </article>`;
 }
 
-function paintStats(items) {
-  const open = items.filter((item) => item.status === "open").length;
-  const near = items.filter((item) => item.status === "focus").length;
-  const done = items.filter((item) => item.status === "done").length;
-  statsEl.innerHTML = `
-    <div class="stat"><b>${open}</b><span>желаю</span></div>
-    <div class="stat"><b>${near}</b><span>близко</span></div>
-    <div class="stat"><b>${done}</b><span>сбылось</span></div>`;
-}
-
-function paintFilters() {
+/** Чипы фильтров сразу показывают, сколько желаний в каждом срезе. */
+function paintFilters(items) {
+  const count = (id) => {
+    if (id === "all") return items.length;
+    if (id === "alive") return items.filter((item) => item.status !== "done").length;
+    return items.filter((item) => item.status === id).length;
+  };
   filterEl.innerHTML = FILTERS.map(([id, label]) => `
-    <button type="button" class="chip ${filter === id ? "is-on" : ""}" data-filter="${id}">${label}</button>
+    <button type="button" class="chip ${filter === id ? "is-on" : ""}" data-filter="${id}">${label}<small>${count(id)}</small></button>
   `).join("");
 }
 
 export function render() {
   if (!root) return;
   const items = wishes();
-  paintStats(items);
-  paintFilters();
+  paintFilters(items);
   const shown = sorted(items);
   if (!shown.length) {
     listEl.innerHTML = `
@@ -112,20 +106,14 @@ export function mount(parent) {
   root.className = "view wishlist-view";
   root.innerHTML = `
     <header class="view-head">
-      <div>
-        <p class="eyebrow">Орбита желаний</p>
-        <h1>Желания</h1>
-        <p class="lede">Не задачи и не заметки — то, чего хочется. От «желаю» до «сбылось».</p>
-      </div>
-      <button type="button" class="btn" data-new>Новое желание</button>
+      <h1>Желания</h1>
     </header>
-    <div class="stats wish-stats"></div>
     <div class="toolbar">
-      <div class="filters"></div>
+      <div class="filters chip-row"></div>
     </div>
-    <div class="wish-scroll"></div>`;
+    <div class="wish-scroll"></div>
+    <button type="button" class="fab" data-new title="Новое желание (N)" aria-label="Новое желание">${icons.plus}</button>`;
   parent.append(root);
-  statsEl = root.querySelector(".wish-stats");
   filterEl = root.querySelector(".filters");
   listEl = root.querySelector(".wish-scroll");
 

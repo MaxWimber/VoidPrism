@@ -736,10 +736,12 @@ export function mount(parent) {
     <header class="canvas-bar">
       <div class="board-tabs"></div>
       <div class="bar-actions">
-        <button type="button" class="mini" data-zoom="out" aria-label="Мельче">−</button>
-        <span class="zoom-label">100%</span>
-        <button type="button" class="mini" data-zoom="in" aria-label="Крупнее">+</button>
-        <button type="button" class="btn ghost slim" data-fit>Вписать</button>
+        <span class="zoom-group">
+          <button type="button" class="mini" data-zoom="out" aria-label="Мельче">−</button>
+          <span class="zoom-label">100%</span>
+          <button type="button" class="mini" data-zoom="in" aria-label="Крупнее">+</button>
+        </span>
+        <button type="button" class="mini" data-fit title="Показать всю схему" aria-label="Показать всю схему">${icons.fit}</button>
         <button type="button" class="mini" data-undo aria-label="Отменить">${icons.undo}</button>
         <button type="button" class="mini" data-redo aria-label="Повторить">${icons.redo}</button>
         <button type="button" class="mini" data-help aria-label="Подсказки">?</button>
@@ -752,9 +754,7 @@ export function mount(parent) {
       <div class="board-hint">
         <div>
           <strong>Пустое полотно</strong>
-          ${isMobileApp()
-            ? "Выберите фигуру снизу и поставьте её кликом. Двумя пальцами — масштаб, одним — обзор."
-            : "Выберите фигуру снизу и поставьте её кликом. Колёсико меняет масштаб, пробел двигает обзор."}
+          Выберите фигуру снизу и поставьте её на полотно.
         </div>
       </div>
     </div>
@@ -777,7 +777,7 @@ export function mount(parent) {
   zoomEl = root.querySelector(".zoom-label");
   dockEl = root.querySelector(".tool-dock");
   dockEl.innerHTML = `
-    ${TOOLS.map(([id, label, key, icon]) => `<button type="button" class="tool ${id === "select" ? "is-on" : ""}" data-tool="${id}" title="${label} (${key})">${icon}<span>${label}</span></button>`).join("")}
+    ${TOOLS.map(([id, label, key, icon]) => `<button type="button" class="tool ${id === "select" ? "is-on" : ""}" data-tool="${id}" title="${label} (${key})" aria-label="${label}">${icon}</button>`).join("")}
     <div class="dock-sep"></div>
     <div class="tool-context"></div>`;
   contextEl = dockEl.querySelector(".tool-context");

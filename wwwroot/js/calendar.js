@@ -7,6 +7,7 @@ import {
   formatMonthTitle,
   formatTime,
   hasClockTime,
+  icons,
   parseDayKey,
   startOfDay,
 } from "./ui.js";
@@ -531,9 +532,7 @@ export function mount(parent) {
       <div class="cal-board"></div>
       <section class="cal-panel" aria-label="Записи дня" hidden></section>
     </div>
-    <button type="button" class="fab" data-new title="Новая запись на день (N)" aria-label="Новая запись на день">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-    </button>`;
+    <button type="button" class="fab" data-new title="Новая запись на день (N)" aria-label="Новая запись на день">${icons.plus}</button>`;
   parent.append(root);
   boardEl = root.querySelector(".cal-board");
   panelEl = root.querySelector(".cal-panel");

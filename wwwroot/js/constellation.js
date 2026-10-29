@@ -3,7 +3,7 @@ import { aggregateChecklistProgress, checklistProgress, plainBody, progressArc, 
 import { attachPinch } from "./pinch.js";
 import { isMobileApp } from "./platform.js";
 import { getState, themesOf, update } from "./store.js";
-import { esc, formatDate, toneColor, toneFor, toast } from "./ui.js";
+import { esc, formatDate, icons, toneColor, toneFor, toast } from "./ui.js";
 
 const MAX_THEMES = 22;
 const MAX_ZOOM = 4.2;
@@ -531,11 +531,7 @@ function drawSky(options = {}) {
     </g>`;
   applyCamera();
 
-  legend.textContent = entries.length
-    ? (isMobileApp()
-      ? "Двумя пальцами — масштаб, одним — сдвиг. Орбиты и звёзды можно двигать."
-      : "Орбиты — метки, звёзды — заметки и задачи. Всё можно двигать. Пробел — панорама.")
-    : "Добавьте заметку или задачу — она появится на созвездии.";
+  legend.textContent = entries.length ? "" : "Добавьте заметку или задачу — она появится на созвездии.";
 
   return { width, height, geo, shown, entries: placedEntries };
 }
@@ -767,23 +763,34 @@ export function mount(parent) {
     <div class="constellation-layout">
       <div class="sky">
         <div class="sky-tools">
-          <button type="button" class="mini sky-zoom" data-zoom="out" aria-label="Мельче">−</button>
-          <span class="zoom-label sky-zoom-label">100%</span>
-          <button type="button" class="mini sky-zoom" data-zoom="in" aria-label="Крупнее">+</button>
-          <button type="button" class="btn ghost slim" data-fit title="Показать всё созвездие">Вписать</button>
-          <button type="button" class="btn slim" data-compose title="Собрать орбиты и звёзды">Компоновать</button>
+          <span class="zoom-group">
+            <button type="button" class="mini sky-zoom" data-zoom="out" aria-label="Мельче">−</button>
+            <span class="zoom-label sky-zoom-label">100%</span>
+            <button type="button" class="mini sky-zoom" data-zoom="in" aria-label="Крупнее">+</button>
+          </span>
+          <button type="button" class="icon-tool" data-fit title="Показать всё созвездие" aria-label="Показать всё созвездие">${icons.fit}</button>
+          <button type="button" class="icon-tool" data-compose title="Собрать орбиты и звёзды" aria-label="Собрать орбиты и звёзды">${icons.compose}</button>
         </div>
-        <svg aria-label="Созвездие личности"></svg>
+        <svg class="sky-map" aria-label="Созвездие личности"></svg>
         <p class="legend"></p>
+        <button type="button" class="fab" data-new-star title="Новая запись" aria-label="Новая запись">${icons.plus}</button>
       </div>
       <aside class="dossier"></aside>
     </div>`;
   parent.append(root);
   sky = root.querySelector(".sky");
-  svg = root.querySelector("svg");
+  svg = root.querySelector(".sky-map");
   dossier = root.querySelector(".dossier");
   legend = root.querySelector(".legend");
   zoomLabel = root.querySelector(".sky-zoom-label");
+
+  // «+» на созвездии: новая запись, а если выбрана орбита — сразу с её меткой.
+  root.querySelector("[data-new-star]").addEventListener("click", (event) => {
+    event.stopPropagation();
+    const tags = selected?.type === "theme" && selected.name !== "без темы" ? [selected.name] : [];
+    bridge.newEntry?.({ kind: "note", tags });
+  });
+  root.querySelector("[data-new-star]").addEventListener("pointerdown", (event) => event.stopPropagation());
 
   root.querySelector(".sky-tools").addEventListener("click", (event) => {
     event.stopPropagation();

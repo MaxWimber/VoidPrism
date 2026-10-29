@@ -321,10 +321,36 @@ h1 {
   white-space: nowrap;
 }
 
-/* Архив: «новая запись» — круглая кнопка в правом нижнем углу раздела. */
-.archive-view { position: relative; }
+/* Ряд чипов: одна строка, лишнее прокручивается вбок. Счётчик — внутри чипа. */
+.chip-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
 
-.archive-view .cards-scroll { padding-bottom: 88px; }
+.chip-row::-webkit-scrollbar { display: none; }
+
+.chip-row .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.chip small {
+  margin-left: 6px;
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+/* «+» — главное действие раздела, круглая кнопка в правом нижнем углу. */
+.archive-view,
+.wishlist-view { position: relative; }
+
+.archive-view .cards-scroll,
+.wishlist-view .wish-scroll { padding-bottom: 88px; }
 
 .fab {
   position: absolute;
@@ -1012,7 +1038,7 @@ h1 {
   font-size: 12px;
 }
 
-.sky svg { width: 100%; height: 100%; display: block; touch-action: none; }
+.sky-map { width: 100%; height: 100%; display: block; touch-action: none; }
 
 .sky.is-dragging { cursor: grabbing; }
 
@@ -2165,6 +2191,48 @@ svg.is-live .guide {
 .tool svg { width: 18px; height: 18px; }
 
 .tool span { font-size: 11px; }
+
+/* Вторичные действия — квадратные кнопки-иконки без подписей. */
+.tool-dock .tool {
+  min-width: 44px;
+  padding: 9px;
+}
+
+.mini,
+.icon-tool {
+  display: inline-grid;
+  place-items: center;
+}
+
+.icon-tool {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.icon-tool:hover,
+.icon-tool:focus-visible {
+  background: rgba(126, 231, 255, 0.12);
+}
+
+.icon-tool svg,
+.mini svg {
+  width: 19px;
+  height: 19px;
+}
+
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend:empty { display: none; }
 
 .dock-sep { width: 1px; align-self: stretch; background: var(--line); margin: 4px; }
 

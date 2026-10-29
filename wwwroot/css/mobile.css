@@ -403,7 +403,7 @@ h1 {
   position: absolute;
   top: 8px !important;
   right: 8px !important;
-  left: 8px !important;
+  left: auto !important;
   width: auto !important;
   max-width: none;
   flex-wrap: wrap;
@@ -448,28 +448,32 @@ h1 {
   gap: 0 !important;
 }
 
+/* Схемы на телефоне: вкладки схем и иконки действий в одну строку. */
 .canvas-bar {
   position: relative;
   z-index: 2;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 10px 10px 0 !important;
   gap: 8px !important;
   margin: 0 !important;
 }
 
 .board-tabs {
-  width: 100%;
-  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .bar-actions {
   position: relative;
   z-index: 2;
-  flex-wrap: wrap;
-  width: 100%;
-  order: 2;
-  justify-content: flex-start;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 4px;
+}
+
+/* Масштаб на телефоне — двумя пальцами, кнопки «−/+» не нужны. */
+.zoom-group {
+  display: none !important;
 }
 
 .board-view {
@@ -496,8 +500,8 @@ h1 {
 .tool-dock::-webkit-scrollbar { display: none; }
 
 .tool-dock .tool {
-  flex: 0 0 auto;
-  min-width: 60px;
+  flex: 1 0 auto;
+  min-width: 44px;
 }
 
 .wish-card,
