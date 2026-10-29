@@ -116,9 +116,15 @@ export function isTyping(target) {
 }
 
 let modalOpen = false;
+let modalFinish = null;
 
 export function isModalOpen() {
   return modalOpen;
+}
+
+/** Закрывает открытый диалог как «Отмена». */
+export function dismissModal() {
+  modalFinish?.(false);
 }
 
 export function confirmDialog({ title, text, confirmLabel = "Подтвердить", danger = false }) {
@@ -138,6 +144,7 @@ export function confirmDialog({ title, text, confirmLabel = "Подтверди�
       </div>`;
     const finish = (value) => {
       modalOpen = false;
+      modalFinish = null;
       document.removeEventListener("keydown", onKey, true);
       back.remove();
       resolve(value);
@@ -157,6 +164,7 @@ export function confirmDialog({ title, text, confirmLabel = "Подтверди�
       if (act === "no") finish(false);
       if (act === "yes") finish(true);
     });
+    modalFinish = finish;
     document.addEventListener("keydown", onKey, true);
     document.body.append(back);
     back.querySelector("[data-act='yes']").focus();

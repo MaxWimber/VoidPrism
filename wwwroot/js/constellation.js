@@ -1045,6 +1045,10 @@ export function setActive(on) {
   }
 }
 
+export function isSheetOpen() {
+  return Boolean(root?.classList.contains("is-sheet"));
+}
+
 export function closeSheet() {
   selected = null;
   sheet = false;

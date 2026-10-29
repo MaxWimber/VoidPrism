@@ -2,7 +2,7 @@ const BULLET_RE = /^(\s*)([-*•])\s+(.*)$/;
 const CHECK_RE = /^(\s*)(?:[-*•]\s+)?\[([ xX])\]\s+(.*)$/;
 const NUMBER_RE = /^(\s*)(\d+)[.)]\s+(.*)$/;
 
-function parseLine(line) {
+export function parseLine(line) {
   const check = line.match(CHECK_RE);
   if (check) {
     return { type: "check", indent: check[1], done: check[2].toLowerCase() === "x", text: check[3] };
@@ -249,11 +249,46 @@ export function toggleCheckLine(body, lineIndex) {
   return lines.join("\n");
 }
 
+// --- Блоки чеклистов внутри текста заметки ---
+// Хранятся так: <div class="checklist"><div class="check-row is-done">текст</div>…</div>.
+// Старый формат строк «- [x] текст» по-прежнему читается (карточки, прогресс),
+// а в редакторе превращается в блок.
+
+const CHECKLIST_RE = /class="checklist"/i;
+
+export function hasChecklistBlocks(body) {
+  return CHECKLIST_RE.test(String(body || ""));
+}
+
+export function checklistHtml(items) {
+  const rows = items.map((item) => `<div class="check-row${item.done ? " is-done" : ""}">${esc(item.text)}</div>`);
+  return `<div class="checklist">${rows.join("")}</div>`;
+}
+
+export function toggleCheckRow(body, rowIndex) {
+  const box = document.createElement("div");
+  box.innerHTML = String(body || "");
+  const row = box.querySelectorAll(".checklist .check-row")[rowIndex];
+  if (!row) return body;
+  row.classList.toggle("is-done");
+  return box.innerHTML;
+}
+
 export function checklistProgress(body) {
-  const lines = plainBody(body).split("\n");
   let total = 0;
   let done = 0;
-  for (const line of lines) {
+  let text = plainBody(body);
+  if (hasChecklistBlocks(body)) {
+    const box = document.createElement("div");
+    box.innerHTML = String(body);
+    for (const row of box.querySelectorAll(".checklist .check-row")) {
+      total += 1;
+      if (row.classList.contains("is-done")) done += 1;
+    }
+    box.querySelectorAll(".checklist").forEach((list) => list.remove());
+    text = box.textContent;
+  }
+  for (const line of text.split("\n")) {
     const parsed = parseLine(line);
     if (parsed.type !== "check") continue;
     total += 1;
@@ -286,6 +321,94 @@ export function aggregateChecklistProgress(entries) {
     ratio,
     percent: Math.round(ratio * 100),
   };
+}
+
+// --- Форматированный текст заметки (HTML из редактора) ---
+
+const FMT_CLASS = /^(fmt-bold|fmt-italic|fmt-strike|fmt-u-solid|fmt-u-dash|fmt-u-wave|fmt-u-double|fmt-sub|fmt-sup|fmt-face-sans|fmt-face-display|fmt-face-serif|fmt-size-s|fmt-size-m|fmt-size-l|fmt-c-cyan|fmt-c-violet|fmt-c-rose|fmt-c-amber|fmt-c-mint|fmt-c-ink)$/;
+const KEEP_TAGS = new Set(["SPAN", "IMG", "BR", "DIV", "P", "B", "STRONG", "I", "EM", "S", "STRIKE", "U", "SUB", "SUP"]);
+export const RICH_RE = /<(span|img|b|i|u|s|strong|em|sub|sup|strike)\b|class="checklist"/i;
+export const RICH_SELECTOR = "span, img, b, i, u, s, strong, em, sub, sup, strike, .checklist";
+
+export function isFormatClass(name) {
+  return FMT_CLASS.test(name);
+}
+
+export function unwrapNode(node) {
+  const parent = node.parentNode;
+  if (!parent) return;
+  while (node.firstChild) parent.insertBefore(node.firstChild, node);
+  node.remove();
+}
+
+function stripAttributes(el, keep = []) {
+  [...el.attributes].forEach((attr) => {
+    if (!keep.includes(attr.name)) el.removeAttribute(attr.name);
+  });
+}
+
+export function sanitizeBody(html) {
+  const raw = String(html || "");
+  if (!RICH_RE.test(raw) && !/<(div|p|br)\b/i.test(raw)) return raw;
+  const box = document.createElement("div");
+  box.innerHTML = raw;
+  box.querySelectorAll("[data-ui]").forEach((el) => el.remove());
+  const nodes = [...box.querySelectorAll("*")];
+  for (const el of nodes) {
+    if (!el.parentNode) continue;
+    if (el.tagName === "IMG") {
+      const src = el.getAttribute("src") || "";
+      if (!/^data:image\/(jpeg|png|webp);base64,/i.test(src)) {
+        el.remove();
+        continue;
+      }
+      const align = ["align-left", "align-center", "align-right", "align-full"].find((name) => el.classList.contains(name)) || "align-center";
+      el.className = `note-img ${align}`;
+      stripAttributes(el, ["src", "class", "alt"]);
+      el.setAttribute("alt", "");
+      continue;
+    }
+    if (el.tagName === "BR") continue;
+    if (el.tagName === "SPAN") {
+      const classes = [...el.classList].filter(isFormatClass);
+      if (!classes.length) {
+        unwrapNode(el);
+        continue;
+      }
+      el.className = classes.join(" ");
+      stripAttributes(el, ["class"]);
+      continue;
+    }
+    if (el.tagName === "DIV" && el.classList.contains("checklist")) {
+      el.className = "checklist";
+      stripAttributes(el, ["class"]);
+      continue;
+    }
+    if (el.tagName === "DIV" && el.classList.contains("check-row")) {
+      el.className = el.classList.contains("is-done") ? "check-row is-done" : "check-row";
+      stripAttributes(el, ["class"]);
+      continue;
+    }
+    if (KEEP_TAGS.has(el.tagName)) {
+      stripAttributes(el);
+      continue;
+    }
+    unwrapNode(el);
+  }
+  box.querySelectorAll(".checklist .check-row").forEach((row) => {
+    if (!row.textContent.trim() && !row.querySelector("img")) row.remove();
+  });
+  box.querySelectorAll(".checklist").forEach((list) => {
+    if (!list.querySelector(".check-row")) list.remove();
+  });
+  return box.innerHTML;
+}
+
+/** HTML тела заметки для карточек: форматированный текст как есть, обычный — через renderBody. */
+export function cardBodyHtml(body) {
+  const raw = String(body || "");
+  if (!RICH_RE.test(raw)) return renderBody(raw, { compact: true });
+  return sanitizeBody(raw);
 }
 
 function polar(cx, cy, radius, angle) {

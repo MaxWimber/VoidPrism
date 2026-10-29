@@ -163,8 +163,18 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
+                // Страница сама решает, что значит «назад»: закрыть слой, сохранить запись,
+                // вернуться на прошлую вкладку. Приложение закрываем, только если она ответила false.
                 override fun handleOnBackPressed() {
-                    if (webView.canGoBack()) webView.goBack() else finish()
+                    if (!pageReady) {
+                        finish()
+                        return
+                    }
+                    webView.evaluateJavascript(
+                        "(function(){try{return !!(window.VoidPrismBack&&window.VoidPrismBack());}catch(e){return false;}})()",
+                    ) { handled ->
+                        if (handled != "true") finish()
+                    }
                 }
             },
         )

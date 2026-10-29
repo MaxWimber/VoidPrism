@@ -1,5 +1,22 @@
 import { bridge } from "./bridge.js";
-import { checklistProgress, listEnterInsert, plainBody, plainExcerpt, progressBadgeHtml, renderBody, rewriteListLines, toggleCheckLine } from "./lists.js";
+import {
+  RICH_RE,
+  RICH_SELECTOR,
+  cardBodyHtml,
+  checklistHtml,
+  checklistProgress,
+  isFormatClass,
+  listEnterInsert,
+  parseLine,
+  plainBody,
+  plainExcerpt,
+  progressBadgeHtml,
+  rewriteListLines,
+  sanitizeBody,
+  toggleCheckLine,
+  toggleCheckRow,
+  unwrapNode,
+} from "./lists.js";
 import { getState, update } from "./store.js";
 import {
   confirmDialog,
@@ -197,6 +214,7 @@ function closeDrawer() {
   textTool = "";
   savedRange = null;
   pickedImage = null;
+  resetChecklistState();
   closeWhenPicker();
   drawerEl.classList.remove("is-open");
   drawerEl.querySelector(".drawer")?.classList.remove("is-settings");
@@ -208,17 +226,20 @@ function syncDraftFields() {
   draft.body = sanitizeBody(readBody(body));
 }
 
+/** Выход из редактора с сохранением: стрелка «назад» в шапке и системный жест «назад». */
 function finishEditor() {
+  if (editingList) stopChecklistEdit();
   syncDraftFields();
-  const title = draft.title.trim();
-  if (!title) {
-    if (!plainBody(draft.body).trim() && !String(draft.body).includes("<img")) {
+  if (!draft.title.trim()) {
+    const body = bodyEl();
+    if (!hasContent(body)) {
       closeDrawer();
       return;
     }
-    const error = drawerEl.querySelector(".editor-main .field-error");
-    if (error) error.textContent = "Добавьте название — так запись найдётся и на карте.";
-    return;
+    // Без названия запись не теряем: берём первую строку текста.
+    const first = body.innerText.split("\n").map((line) => parseLine(line.trim()).text.trim()).find(Boolean);
+    draft.title = (first || "Без названия").slice(0, 60);
+    drawerEl.querySelector(".title-input").value = draft.title;
   }
   saveDraft();
 }
@@ -255,86 +276,74 @@ function textStyle() {
   };
 }
 
-const FMT_CLASS = /^(fmt-bold|fmt-italic|fmt-strike|fmt-u-solid|fmt-u-dash|fmt-u-wave|fmt-u-double|fmt-sub|fmt-sup|fmt-face-sans|fmt-face-display|fmt-face-serif|fmt-size-s|fmt-size-m|fmt-size-l|fmt-c-cyan|fmt-c-violet|fmt-c-rose|fmt-c-amber|fmt-c-mint|fmt-c-ink)$/;
-const KEEP_TAGS = new Set(["SPAN", "IMG", "BR", "DIV", "P", "B", "STRONG", "I", "EM", "S", "STRIKE", "U", "SUB", "SUP"]);
-const RICH_RE = /<(span|img|b|i|u|s|strong|em|sub|sup|strike)\b/i;
+function isChecklist(node) {
+  return node?.nodeType === 1 && node.classList.contains("checklist");
+}
 
-function cardBodyHtml(body) {
-  const raw = String(body || "");
-  if (!RICH_RE.test(raw)) return renderBody(raw, { compact: true });
-  return sanitizeBody(raw);
+function hasContent(el) {
+  return Boolean(plainBody(el.innerHTML).trim()) || Boolean(el.querySelector("img, .checklist"));
 }
 
 function readBody(el) {
   if (!el) return "";
   const html = el.innerHTML.replace(/\u00a0/g, " ").trim();
   if (!html || html === "<br>") return "";
-  if (!el.querySelector("span, img, b, i, u, s, strong, em, sub, sup, strike")) {
+  if (!el.querySelector(RICH_SELECTOR)) {
     return el.innerText.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n");
   }
-  return html;
+  // \u041a\u043d\u043e\u043f\u043a\u0438 \u0438 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u044f \u0431\u043b\u043e\u043a\u043e\u0432 \u0447\u0435\u043a\u043b\u0438\u0441\u0442\u0430 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044e\u0442 \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u0440\u0435\u0434\u0430\u043a\u0442\u043e\u0440\u0435 \u2014 \u0432 \u0437\u0430\u043f\u0438\u0441\u044c \u043d\u0435 \u043f\u043e\u043f\u0430\u0434\u0430\u044e\u0442.
+  const box = el.cloneNode(true);
+  box.querySelectorAll("[data-ui]").forEach((node) => node.remove());
+  box.querySelectorAll(".checklist, .check-row").forEach((node) => {
+    node.removeAttribute("contenteditable");
+    node.classList.remove("is-lifted", "is-editing", "is-dragging", "drop-before", "drop-after");
+  });
+  box.querySelectorAll(".drop-before, .drop-after").forEach((node) => node.classList.remove("drop-before", "drop-after"));
+  return box.innerHTML.replace(/\u00a0/g, " ").trim();
 }
 
 function writeBody(el, value) {
   const raw = String(value || "");
   if (RICH_RE.test(raw)) el.innerHTML = sanitizeBody(raw);
   else el.innerHTML = raw ? esc(raw).replace(/\n/g, "<br>") : "";
-  el.classList.toggle("is-empty", !plainBody(raw).trim() && !el.querySelector("img"));
+  if (plainBody(raw).split("\n").some((line) => parseLine(line).type === "check")) convertLegacyChecks(el);
+  decorateChecklists(el);
+  el.classList.toggle("is-empty", !hasContent(el));
 }
 
-function sanitizeBody(html) {
-  const raw = String(html || "");
-  if (!RICH_RE.test(raw) && !/<(div|p|br)\b/i.test(raw)) return raw;
-  const box = document.createElement("div");
-  box.innerHTML = raw;
-  const nodes = [...box.querySelectorAll("*")];
-  for (const el of nodes) {
-    if (!el.parentNode) continue;
-    if (el.tagName === "IMG") {
-      const src = el.getAttribute("src") || "";
-      if (!/^data:image\/(jpeg|png|webp);base64,/i.test(src)) {
-        el.remove();
-        continue;
-      }
-      const align = ["align-left", "align-center", "align-right", "align-full"].find((name) => el.classList.contains(name)) || "align-center";
-      el.className = `note-img ${align}`;
-      [...el.attributes].forEach((attr) => {
-        if (attr.name !== "src" && attr.name !== "class" && attr.name !== "alt") el.removeAttribute(attr.name);
-      });
-      el.setAttribute("alt", "");
-      continue;
-    }
-    if (el.tagName === "BR") continue;
-    if (el.tagName === "SPAN") {
-      const classes = [...el.classList].filter((name) => FMT_CLASS.test(name));
-      if (!classes.length) {
-        unwrapNode(el);
-        continue;
-      }
-      el.className = classes.join(" ");
-      [...el.attributes].forEach((attr) => {
-        if (attr.name !== "class") el.removeAttribute(attr.name);
-      });
-      continue;
-    }
-    if (el.tagName === "DIV" || el.tagName === "P") {
-      [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
-      continue;
-    }
-    if (KEEP_TAGS.has(el.tagName)) {
-      [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
-      continue;
-    }
-    unwrapNode(el);
+/** \u0421\u0442\u0440\u043e\u043a\u0438 \u0441\u0442\u0430\u0440\u043e\u0433\u043e \u0444\u043e\u0440\u043c\u0430\u0442\u0430 \u00ab- [x] \u0442\u0435\u043a\u0441\u0442\u00bb \u0441\u043e\u0431\u0438\u0440\u0430\u0435\u043c \u0432 \u0431\u043b\u043e\u043a\u0438 \u0447\u0435\u043a\u043b\u0438\u0441\u0442\u043e\u0432. */
+function convertLegacyChecks(el) {
+  normalizeBlocks(el);
+  const blocks = lineBlocks(el) || [];
+  let group = [];
+  const flush = () => {
+    if (!group.length) return;
+    const holder = document.createElement("div");
+    holder.innerHTML = checklistHtml(group.map(({ parsed }) => ({ text: parsed.text, done: parsed.done })));
+    group[0].node.before(holder.firstChild);
+    group.forEach(({ node }) => node.remove());
+    group = [];
+  };
+  for (const node of blocks) {
+    const parsed = isChecklist(node) ? null : parseLine(node.textContent);
+    if (parsed?.type === "check") group.push({ node, parsed });
+    else flush();
   }
-  return box.innerHTML;
+  flush();
 }
 
-function unwrapNode(node) {
-  const parent = node.parentNode;
-  if (!parent) return;
-  while (node.firstChild) parent.insertBefore(node.firstChild, node);
-  node.remove();
+function decorateChecklists(el) {
+  el.querySelectorAll(".checklist").forEach((list) => {
+    list.setAttribute("contenteditable", "false");
+  });
+  const last = el.lastElementChild;
+  if (isChecklist(last)) el.append(emptyLine());
+}
+
+function emptyLine() {
+  const line = document.createElement("div");
+  line.append(document.createElement("br"));
+  return line;
 }
 
 function rememberRange() {
@@ -361,8 +370,8 @@ function restoreRange() {
 function commitBody() {
   const el = drawerEl.querySelector(".body-input");
   draft.body = readBody(el);
-  el.classList.toggle("is-empty", !plainBody(draft.body).trim() && !el.querySelector("img"));
-  paintPreview();
+  el.classList.toggle("is-empty", !hasContent(el));
+  paintProgress();
 }
 
 function applyExclusive(cls, group) {
@@ -384,7 +393,7 @@ function applyExclusive(cls, group) {
     const frag = range.extractContents();
     frag.querySelectorAll("span").forEach((node) => {
       group.forEach((name) => node.classList.remove(name));
-      if (![...node.classList].some((name) => FMT_CLASS.test(name))) unwrapNode(node);
+      if (![...node.classList].some(isFormatClass)) unwrapNode(node);
     });
     span.append(frag);
     range.insertNode(span);
@@ -428,26 +437,45 @@ function applyCase(mode) {
   commitBody();
 }
 
-function lineSpanFrom(el) {
+// normalizeBlocks перекладывает узлы, и живой Range после этого теряется,
+// поэтому края выделения отмечаем пустыми span-маркерами — они переезжают вместе с текстом.
+function markSelection(el) {
   const sel = document.getSelection();
   let range = savedRange;
   if (sel?.rangeCount && el.contains(sel.anchorNode)) range = sel.getRangeAt(0);
-  const lines = el.innerText.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
-  const last = Math.max(0, lines.length - 1);
-  if (!range) return [0, last];
+  if (!range || !el.contains(range.startContainer) || !el.contains(range.endContainer)) return null;
+  const start = document.createElement("span");
+  const end = document.createElement("span");
+  start.dataset.mark = "start";
+  end.dataset.mark = "end";
   try {
-    const beforeStart = document.createRange();
-    beforeStart.selectNodeContents(el);
-    beforeStart.setEnd(range.startContainer, range.startOffset);
-    const beforeEnd = document.createRange();
-    beforeEnd.selectNodeContents(el);
-    beforeEnd.setEnd(range.endContainer, range.endOffset);
-    const start = beforeStart.toString().split("\n").length - 1;
-    const end = beforeEnd.toString().split("\n").length - 1;
-    return [Math.max(0, Math.min(start, end, last)), Math.max(0, Math.min(Math.max(start, end), last))];
+    const tail = range.cloneRange();
+    tail.collapse(false);
+    tail.insertNode(end);
+    const head = range.cloneRange();
+    head.collapse(true);
+    head.insertNode(start);
   } catch {
-    return [0, last];
+    start.remove();
+    end.remove();
+    return null;
   }
+  return { start, end };
+}
+
+/** Индексы строк-блоков от строки с началом выделения до строки с его концом. */
+function pickedBlocks(blocks, marks) {
+  if (!marks) return [];
+  let from = blocks.findIndex((block) => block.contains(marks.start));
+  let to = blocks.findIndex((block) => block.contains(marks.end));
+  marks.start.remove();
+  marks.end.remove();
+  if (from < 0) from = to;
+  if (to < 0) to = from;
+  if (from < 0) return [];
+  const picked = [];
+  for (let i = Math.min(from, to); i <= Math.max(from, to); i += 1) picked.push(i);
+  return picked;
 }
 
 function lineBlocks(el) {
@@ -504,6 +532,12 @@ function normalizeBlocks(el) {
       lines.push(document.createElement("div"));
       return;
     }
+    if (isChecklist(node)) {
+      if (lines[lines.length - 1].childNodes.length) lines.push(node);
+      else lines[lines.length - 1] = node;
+      lines.push(document.createElement("div"));
+      return;
+    }
     if (node.tagName === "DIV" || node.tagName === "P") {
       if (lines[lines.length - 1].childNodes.length) lines.push(document.createElement("div"));
       while (node.firstChild) push(node.firstChild);
@@ -518,23 +552,384 @@ function normalizeBlocks(el) {
 }
 
 function applyList(type) {
+  if (type === "check") {
+    createChecklist();
+    return;
+  }
   const el = drawerEl.querySelector(".body-input");
-  const before = el.innerText.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
-  const [from, to] = lineSpanFrom(el);
+  const marks = markSelection(el);
   normalizeBlocks(el);
-  const nodes = lineBlocks(el);
-  const lines = nodes ? nodes.map((node) => node.innerText.replace(/\n/g, "")) : before;
-  const same = nodes && (nodes.length === before.length || nodes.length === lines.length);
-  const source = same ? lines : before;
-  const start = Math.max(0, Math.min(from, source.length - 1));
-  const end = Math.max(start, Math.min(to, source.length - 1));
-  const next = rewriteListLines(source, start, end, type);
-  if (nodes && nodes.length === source.length) {
-    for (let i = start; i <= end; i += 1) setLineText(nodes[i], source[i], next[i]);
+  const all = lineBlocks(el) || [];
+  const picked = new Set(pickedBlocks(all, marks).map((index) => all[index]));
+  let nodes = all.filter((node) => !isChecklist(node));
+  if (!nodes.length) {
+    const line = emptyLine();
+    el.append(line);
+    nodes = [line];
+    picked.add(line);
+  }
+  const indexes = nodes.map((node, index) => (picked.has(node) ? index : -1)).filter((index) => index >= 0);
+  const from = indexes.length ? indexes[0] : nodes.length - 1;
+  const to = indexes.length ? indexes[indexes.length - 1] : nodes.length - 1;
+  const lines = nodes.map((node) => node.textContent.replace(/\n/g, ""));
+  const next = rewriteListLines(lines, from, to, type);
+  for (let i = from; i <= to; i += 1) setLineText(nodes[i], lines[i], next[i]);
+  commitBody();
+}
+
+/** Выделенные строки (или строка с кареткой) становятся блоком чеклиста. */
+function createChecklist() {
+  const el = drawerEl.querySelector(".body-input");
+  const marks = markSelection(el);
+  normalizeBlocks(el);
+  const all = lineBlocks(el) || [];
+  const picked = pickedBlocks(all, marks).map((index) => all[index]).filter((node) => !isChecklist(node));
+  const items = picked
+    .map((node) => {
+      const parsed = parseLine(node.textContent.replace(/\n/g, ""));
+      return { text: parsed.text.trim(), done: Boolean(parsed.done) };
+    })
+    .filter((item) => item.text);
+  const holder = document.createElement("div");
+  holder.innerHTML = checklistHtml(items.length ? items : [{ text: "", done: false }]);
+  const list = holder.firstChild;
+  if (picked.length) {
+    picked[0].before(list);
+    picked.forEach((node) => node.remove());
   } else {
-    writeBody(el, next.join("\n"));
+    el.append(list);
+  }
+  decorateChecklists(el);
+  commitBody();
+  if (!items.length) startChecklistEdit(list);
+  else selectChecklist(list);
+}
+
+// --- Блок чеклиста в редакторе ---
+// Тап по пункту отмечает его. Удержание поднимает блок: справа появляются кнопки,
+// и, не отпуская палец, блок можно перетащить между абзацами.
+
+const HOLD_MS = 420;
+const ICON_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19h3.5l9.7-9.7a1.8 1.8 0 0 0 0-2.5l-1-1a1.8 1.8 0 0 0-2.5 0L5 15.5V19z" stroke-linejoin="round"/><path d="m13.5 7 3.5 3.5"/></svg>`;
+const ICON_DONE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m5 12.5 4.2 4.2L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_TEXT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M5 12h14M5 17h9" stroke-linecap="round"/></svg>`;
+const ICON_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+let activeList = null;
+let editingList = null;
+let press = null;
+
+function bodyEl() {
+  return drawerEl.querySelector(".body-input");
+}
+
+function checklistTools() {
+  return drawerEl.querySelector(".checklist-tools");
+}
+
+function positionChecklistTools() {
+  const tools = checklistTools();
+  if (!activeList?.isConnected || press?.dragging) {
+    tools.hidden = true;
+    return;
+  }
+  const card = drawerEl.querySelector(".text-card").getBoundingClientRect();
+  const body = bodyEl().getBoundingClientRect();
+  const rect = activeList.getBoundingClientRect();
+  tools.hidden = rect.bottom < body.top + 8 || rect.top > body.bottom - 8;
+  if (tools.hidden) return;
+  const top = Math.max(body.top + 4, Math.min(rect.top + 4, body.bottom - tools.offsetHeight - 4));
+  tools.style.top = `${top - card.top}px`;
+  tools.style.right = `${card.right - rect.right + 6}px`;
+}
+
+function selectChecklist(list) {
+  if (activeList && activeList !== list) clearChecklistSelection();
+  activeList = list;
+  list.classList.add("is-lifted");
+  const edit = checklistTools().querySelector('[data-cl="edit"]');
+  const editing = list === editingList;
+  edit.innerHTML = editing ? ICON_DONE : ICON_EDIT;
+  edit.setAttribute("aria-label", editing ? "Готово" : "Редактировать список");
+  positionChecklistTools();
+}
+
+function clearChecklistSelection() {
+  if (editingList) stopChecklistEdit();
+  activeList?.classList.remove("is-lifted");
+  activeList = null;
+  checklistTools().hidden = true;
+}
+
+function resetChecklistState() {
+  activeList = null;
+  editingList = null;
+  if (press) clearTimeout(press.timer);
+  press = null;
+  const tools = checklistTools();
+  if (tools) tools.hidden = true;
+}
+
+function focusRow(row) {
+  if (!row) return;
+  row.focus();
+  const range = document.createRange();
+  range.selectNodeContents(row);
+  range.collapse(false);
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function makeRow(text = "") {
+  const row = document.createElement("div");
+  row.className = "check-row";
+  row.textContent = text;
+  row.setAttribute("contenteditable", "true");
+  return row;
+}
+
+function startChecklistEdit(list) {
+  if (editingList && editingList !== list) stopChecklistEdit();
+  editingList = list;
+  list.classList.add("is-editing");
+  list.querySelectorAll(".check-row").forEach((row) => row.setAttribute("contenteditable", "true"));
+  if (!list.querySelector(".check-add")) {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "check-add";
+    add.dataset.ui = "1";
+    add.textContent = "+ пункт";
+    list.append(add);
+  }
+  selectChecklist(list);
+  const rows = [...list.querySelectorAll(".check-row")];
+  focusRow(rows.find((row) => !row.textContent.trim()) || rows[rows.length - 1]);
+}
+
+function stopChecklistEdit() {
+  const list = editingList;
+  editingList = null;
+  if (!list) return;
+  list.classList.remove("is-editing");
+  list.querySelectorAll("[data-ui]").forEach((node) => node.remove());
+  list.querySelectorAll(".check-row").forEach((row) => {
+    row.removeAttribute("contenteditable");
+    if (!row.textContent.trim()) row.remove();
+  });
+  if (!list.querySelector(".check-row")) {
+    if (activeList === list) activeList = null;
+    checklistTools().hidden = true;
+    list.remove();
+  } else if (activeList === list) {
+    selectChecklist(list);
   }
   commitBody();
+}
+
+function addRowAfter(row) {
+  const next = makeRow();
+  row.after(next);
+  focusRow(next);
+  commitBody();
+  positionChecklistTools();
+}
+
+function addRowAtEnd(list) {
+  const rows = list.querySelectorAll(".check-row");
+  const last = rows[rows.length - 1];
+  if (last) addRowAfter(last);
+  else {
+    const row = makeRow();
+    list.prepend(row);
+    focusRow(row);
+  }
+}
+
+function onRowKey(event) {
+  const row = event.target.closest?.(".check-row");
+  if (!row || !editingList?.contains(row)) return false;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addRowAfter(row);
+    return true;
+  }
+  if (event.key === "Backspace" && !row.textContent) {
+    event.preventDefault();
+    const rows = [...editingList.querySelectorAll(".check-row")];
+    if (rows.length <= 1) return true;
+    const index = rows.indexOf(row);
+    row.remove();
+    focusRow(rows[index - 1] || rows[index + 1]);
+    commitBody();
+    positionChecklistTools();
+    return true;
+  }
+  return false;
+}
+
+function toggleRow(row) {
+  row.classList.toggle("is-done");
+  commitBody();
+}
+
+function checklistToText(list) {
+  const lines = [...list.querySelectorAll(".check-row")].map((row) => row.textContent.trim()).filter(Boolean);
+  const nodes = lines.map((text) => {
+    const line = document.createElement("div");
+    line.textContent = text;
+    return line;
+  });
+  if (editingList === list) editingList = null;
+  activeList = null;
+  checklistTools().hidden = true;
+  list.replaceWith(...(nodes.length ? nodes : [emptyLine()]));
+  commitBody();
+}
+
+function deleteChecklist(list) {
+  if (editingList === list) editingList = null;
+  activeList = null;
+  checklistTools().hidden = true;
+  list.remove();
+  commitBody();
+}
+
+function clearDropMarks() {
+  bodyEl().querySelectorAll(".drop-before, .drop-after").forEach((node) => node.classList.remove("drop-before", "drop-after"));
+}
+
+function dropTarget(list, y) {
+  const blocks = [...bodyEl().children].filter((node) => node !== list && !node.dataset.ui);
+  for (const node of blocks) {
+    const rect = node.getBoundingClientRect();
+    if (y < rect.top + rect.height / 2) return { node, before: true };
+  }
+  const last = blocks[blocks.length - 1];
+  return last ? { node: last, before: false } : null;
+}
+
+function onChecklistPointerDown(event) {
+  const list = event.target.closest?.(".checklist");
+  if (!list || event.button > 0) return;
+  if (list === editingList) return;
+  event.preventDefault();
+  if (activeList && activeList !== list) clearChecklistSelection();
+  press = {
+    list,
+    row: event.target.closest(".check-row"),
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    lifted: list === activeList,
+    held: false,
+    dragging: false,
+    target: null,
+    timer: 0,
+  };
+  press.timer = setTimeout(() => {
+    if (!press || press.list !== list) return;
+    press.held = true;
+    press.lifted = true;
+    selectChecklist(list);
+    navigator.vibrate?.(12);
+  }, HOLD_MS);
+}
+
+function onChecklistPointerMove(event) {
+  if (!press || event.pointerId !== press.id) return;
+  const dist = Math.hypot(event.clientX - press.x, event.clientY - press.y);
+  if (!press.lifted) {
+    if (dist > 8) {
+      clearTimeout(press.timer);
+      press = null;
+    }
+    return;
+  }
+  if (!press.dragging) {
+    if (dist < 6) return;
+    clearTimeout(press.timer);
+    press.dragging = true;
+    normalizeBlocks(bodyEl());
+    press.list.classList.add("is-dragging");
+    checklistTools().hidden = true;
+    try {
+      bodyEl().setPointerCapture(press.id);
+    } catch {
+      /* указатель уже отпущен */
+    }
+  }
+  event.preventDefault();
+  const body = bodyEl();
+  const rect = body.getBoundingClientRect();
+  if (event.clientY < rect.top + 36) body.scrollTop -= 12;
+  else if (event.clientY > rect.bottom - 36) body.scrollTop += 12;
+  clearDropMarks();
+  press.target = dropTarget(press.list, event.clientY);
+  press.target?.node.classList.add(press.target.before ? "drop-before" : "drop-after");
+}
+
+function onChecklistPointerUp(event) {
+  if (!press || event.pointerId !== press.id) return;
+  const current = press;
+  press = null;
+  clearTimeout(current.timer);
+  if (current.dragging) {
+    clearDropMarks();
+    current.list.classList.remove("is-dragging");
+    const { target } = current;
+    if (target) {
+      if (target.before) target.node.before(current.list);
+      else target.node.after(current.list);
+    }
+    decorateChecklists(bodyEl());
+    commitBody();
+    selectChecklist(current.list);
+    return;
+  }
+  if (event.type === "pointerup" && !current.held && current.row) toggleRow(current.row);
+}
+
+function bindChecklists() {
+  const body = bodyEl();
+  body.addEventListener("pointerdown", onChecklistPointerDown);
+  body.addEventListener("pointermove", onChecklistPointerMove);
+  body.addEventListener("pointerup", onChecklistPointerUp);
+  body.addEventListener("pointercancel", onChecklistPointerUp);
+  // Пока блок поднят, палец двигает его, а не прокручивает текст.
+  body.addEventListener("touchmove", (event) => {
+    if (press?.lifted) event.preventDefault();
+  }, { passive: false });
+  body.addEventListener("contextmenu", (event) => {
+    if (event.target.closest(".checklist")) event.preventDefault();
+  });
+  body.addEventListener("scroll", positionChecklistTools);
+  window.addEventListener("resize", () => {
+    if (activeList) positionChecklistTools();
+  });
+  drawerEl.addEventListener("pointerdown", (event) => {
+    if (!activeList) return;
+    if (event.target.closest(".checklist") || event.target.closest(".checklist-tools")) return;
+    clearChecklistSelection();
+  });
+  const tools = checklistTools();
+  tools.querySelector('[data-cl="text"]').innerHTML = ICON_TEXT;
+  tools.querySelector('[data-cl="delete"]').innerHTML = ICON_TRASH;
+  tools.addEventListener("pointerdown", (event) => event.preventDefault());
+  tools.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const action = event.target.closest("[data-cl]")?.dataset.cl;
+    const list = activeList;
+    if (!action || !list) return;
+    if (action === "edit") {
+      if (editingList === list) stopChecklistEdit();
+      else startChecklistEdit(list);
+    } else if (action === "text") {
+      checklistToText(list);
+    } else if (action === "delete") {
+      deleteChecklist(list);
+    }
+  });
 }
 
 function lineBlockAt(root, node) {
@@ -615,61 +1010,12 @@ function alignImage(mode) {
   commitBody();
 }
 
-const CHECK_MIN = 72;
-const CHECK_MAX = 420;
-
-function clampCheck(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 132;
-  return Math.min(CHECK_MAX, Math.max(CHECK_MIN, Math.round(n)));
-}
-
-function bindCheckResize() {
-  const handle = drawerEl.querySelector("[data-check-split]");
-  if (!handle || handle.dataset.bound) return;
-  handle.dataset.bound = "1";
-  handle.addEventListener("pointerdown", (event) => {
-    const main = drawerEl.querySelector(".editor-main");
-    const card = drawerEl.querySelector(".check-card");
-    if (!main?.classList.contains("has-checks") || !card || document.body.classList.contains("is-keyboard")) return;
-    event.preventDefault();
-    const startY = event.clientY;
-    const startH = card.getBoundingClientRect().height;
-    const style = getComputedStyle(main);
-    const inner = main.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-    const max = Math.max(CHECK_MIN, Math.min(CHECK_MAX, inner - 48 - 140 - 68 - 22 - 32));
-    const move = (nextEvent) => {
-      const height = Math.round(Math.min(max, Math.max(CHECK_MIN, startH + (startY - nextEvent.clientY))));
-      draft.checkHeight = height;
-      main.style.setProperty("--check-h", `${height}px`);
-    };
-    const stop = () => {
-      handle.releasePointerCapture?.(event.pointerId);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-    };
-    handle.setPointerCapture?.(event.pointerId);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  });
-}
-
-function paintPreview() {
-  const preview = drawerEl.querySelector(".body-preview");
+function paintProgress() {
   const progressEl = drawerEl.querySelector(".editor-progress");
-  if (!preview) return;
-  const checks = renderBody(draft.body, { checksOnly: true });
-  const hasChecks = Boolean(checks) && !checks.includes("body-empty");
-  preview.innerHTML = hasChecks ? checks : "";
   const main = drawerEl.querySelector(".editor-main");
-  main?.classList.toggle("has-checks", hasChecks);
-  if (main) main.style.setProperty("--check-h", `${clampCheck(draft?.checkHeight)}px`);
-  if (!progressEl) return;
-  const progress = checklistProgress(draft.body);
-  progressEl.hidden = false;
-  progressEl.innerHTML = progress ? progressBadgeHtml(progress) : "";
+  const progress = checklistProgress(draft?.body);
+  main?.classList.toggle("has-checks", Boolean(progress));
+  if (progressEl) progressEl.innerHTML = progress ? progressBadgeHtml(progress) : "";
 }
 
 function paintTools() {
@@ -690,6 +1036,7 @@ function paintDrawer() {
   const statusRow = drawerEl.querySelector(".status-row");
   const pin = drawerEl.querySelector("[data-pin-input]");
   title.value = draft.title;
+  resetChecklistState();
   writeBody(body, draft.body);
   drawerEl.querySelectorAll(".field-error").forEach((el) => {
     el.textContent = "";
@@ -716,7 +1063,7 @@ function paintDrawer() {
     <span class="tag-chip">${esc(tag)}<button type="button" data-drop="${index}" aria-label="Убрать метку">×</button></span>
   `).join("");
   paintTools();
-  paintPreview();
+  paintProgress();
 }
 
 export function openEditor(id, preset = {}) {
@@ -754,8 +1101,7 @@ function saveDraft() {
     return;
   }
   saved.textStyle = textStyle();
-  if (Number.isFinite(Number(saved.checkHeight))) saved.checkHeight = clampCheck(saved.checkHeight);
-  else delete saved.checkHeight;
+  delete saved.checkHeight;
   update((state) => {
     const index = state.entries.findIndex((entry) => entry.id === saved.id);
     if (index >= 0) state.entries[index] = saved;
@@ -856,13 +1202,51 @@ function paintMonth() {
   drawerEl.querySelector(".when-grid").innerHTML = cells.join("");
 }
 
+// Циферблат обычный, 12-часовой: 60 минутных делений и 12 часовых.
+// Время всегда остаётся внутри выбранного дня (00:00–23:59).
+function hourAngle() {
+  return (whenPick.hour % 12) * 30 + whenPick.minute * 0.5;
+}
+
+function clockText() {
+  return `${String(whenPick.hour).padStart(2, "0")}:${String(whenPick.minute).padStart(2, "0")}`;
+}
+
 function paintClock() {
-  const hourAngle = (whenPick.hour % 24) * 15 + whenPick.minute * 0.25;
-  drawerEl.querySelector(".clock-hand.hour").style.transform = `rotate(${hourAngle}deg)`;
+  drawerEl.querySelector(".clock-hand.hour").style.transform = `rotate(${hourAngle()}deg)`;
   drawerEl.querySelector(".clock-hand.minute").style.transform = `rotate(${whenPick.minute * 6}deg)`;
-  const hh = String(whenPick.hour).padStart(2, "0");
-  const mm = String(whenPick.minute).padStart(2, "0");
-  drawerEl.querySelector(".when-clock-readout").textContent = `${hh}:${mm}`;
+  const readout = drawerEl.querySelector(".when-clock-readout");
+  if (document.activeElement !== readout) readout.value = clockText();
+}
+
+/** «1930», «19:30», «930», «9» → часы и минуты; null, если ввод не похож на время. */
+function parseClockInput(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return null;
+  let hour;
+  let minute = 0;
+  if (digits.length <= 2) hour = Number(digits);
+  else if (digits.length === 3) {
+    hour = Number(digits.slice(0, 1));
+    minute = Number(digits.slice(1));
+  } else {
+    hour = Number(digits.slice(0, 2));
+    minute = Number(digits.slice(2, 4));
+  }
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
+function commitClockInput() {
+  const readout = drawerEl.querySelector(".when-clock-readout");
+  if (!whenPick || !readout) return;
+  const parsed = parseClockInput(readout.value);
+  if (parsed) {
+    whenPick.hour = parsed.hour;
+    whenPick.minute = parsed.minute;
+  }
+  readout.value = clockText();
+  paintClock();
 }
 
 function paintWhenPicker() {
@@ -871,24 +1255,16 @@ function paintWhenPicker() {
   paintClock();
 }
 
+/** Сдвигает час, не выходя за пределы дня. Возвращает true, если сдвиг удался целиком. */
 function shiftClockHour(delta) {
-  let hour = whenPick.hour + delta;
-  const day = new Date(whenPick.day);
-  while (hour >= 24) {
-    hour -= 24;
-    day.setDate(day.getDate() + 1);
-  }
-  while (hour < 0) {
-    hour += 24;
-    day.setDate(day.getDate() - 1);
-  }
-  day.setHours(0, 0, 0, 0);
+  const hour = Math.min(23, Math.max(0, whenPick.hour + delta));
+  const moved = hour - whenPick.hour === delta;
   whenPick.hour = hour;
-  whenPick.day = day.getTime();
-  whenPick.cursor = new Date(day.getFullYear(), day.getMonth(), 1).getTime();
+  return moved;
 }
 
 function commitWhen() {
+  if (document.activeElement?.classList.contains("when-clock-readout")) commitClockInput();
   const date = new Date(whenPick.day);
   date.setHours(whenPick.hour, whenPick.minute, 0, 0);
   draft.when = date.getTime();
@@ -954,10 +1330,8 @@ function bindWhenPicker() {
     paintDateLabel();
   });
   const pickHand = (point) => {
-    const hourAngle = (whenPick.hour % 24) * 15 + whenPick.minute * 0.25;
-    const minuteAngle = whenPick.minute * 6;
-    const nearHour = angleDist(point.deg, hourAngle);
-    const nearMinute = angleDist(point.deg, minuteAngle);
+    const nearHour = angleDist(point.deg, hourAngle());
+    const nearMinute = angleDist(point.deg, whenPick.minute * 6);
     if (point.radius < 0.58 && nearHour <= nearMinute + 10) return "hour";
     if (nearMinute + 6 < nearHour) return "minute";
     return point.radius < 0.62 ? "hour" : "minute";
@@ -966,17 +1340,17 @@ function bindWhenPicker() {
     if (!whenPick || !whenPick.drag) return;
     const point = clockPoint(event, face);
     if (whenPick.drag === "hour") {
-      const next = Math.round(point.deg / 15) % 24;
-      shiftClockHour(shortDelta(next, whenPick.hour, 24));
+      // Стрелка крутится по кругу: переход через 12 меняет первую половину дня на вторую.
+      const next = Math.round(point.deg / 30) % 12;
+      shiftClockHour(shortDelta(next, whenPick.hour % 12, 12));
     } else {
       const next = Math.round(point.deg / 6) % 60;
-      const delta = shortDelta(next, whenPick.minute, 60);
-      const raw = whenPick.minute + delta;
-      if (raw >= 60) shiftClockHour(1);
-      else if (raw < 0) shiftClockHour(-1);
-      whenPick.minute = (raw + 60) % 60;
+      const raw = whenPick.minute + shortDelta(next, whenPick.minute, 60);
+      if (raw >= 60) whenPick.minute = shiftClockHour(1) ? raw - 60 : 59;
+      else if (raw < 0) whenPick.minute = shiftClockHour(-1) ? raw + 60 : 0;
+      else whenPick.minute = raw;
     }
-    paintWhenPicker();
+    paintClock();
   };
   face.addEventListener("pointerdown", (event) => {
     if (!whenPick) return;
@@ -994,6 +1368,19 @@ function bindWhenPicker() {
   };
   face.addEventListener("pointerup", releaseHand);
   face.addEventListener("pointercancel", releaseHand);
+  const readout = sheet.querySelector(".when-clock-readout");
+  readout.addEventListener("focus", () => readout.select());
+  readout.addEventListener("input", () => {
+    const digits = readout.value.replace(/\D/g, "").slice(0, 4);
+    readout.value = digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+  });
+  readout.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      readout.blur();
+    }
+  });
+  readout.addEventListener("blur", commitClockInput);
 }
 
 function bindDrawer() {
@@ -1043,13 +1430,6 @@ function bindDrawer() {
     const list = event.target.closest("[data-list]")?.dataset.list;
     if (list) {
       applyList(list);
-      return;
-    }
-    const checkLine = event.target.closest("[data-check-line]")?.dataset.checkLine;
-    if (checkLine != null && event.target.closest(".body-preview")) {
-      draft.body = toggleCheckLine(draft.body, Number(checkLine));
-      writeBody(drawerEl.querySelector(".body-input"), draft.body);
-      paintPreview();
       return;
     }
     const face = event.target.closest("[data-font]")?.dataset.font;
@@ -1120,7 +1500,7 @@ function bindDrawer() {
     draft.title = event.target.value;
   });
   const bodyInput = drawerEl.querySelector(".body-input");
-  bindCheckResize();
+  bindChecklists();
   drawerEl.querySelector(".text-dock").addEventListener("pointerdown", (event) => {
     if (event.target.closest("[data-image-add]")) return;
     if (event.target.closest("button")) event.preventDefault();
@@ -1128,10 +1508,21 @@ function bindDrawer() {
   document.addEventListener("selectionchange", rememberRange);
   bodyInput.addEventListener("input", () => {
     draft.body = readBody(bodyInput);
-    bodyInput.classList.toggle("is-empty", !plainBody(draft.body).trim() && !bodyInput.querySelector("img"));
-    paintPreview();
+    bodyInput.classList.toggle("is-empty", !hasContent(bodyInput));
+    paintProgress();
+    if (activeList) positionChecklistTools();
   });
   bodyInput.addEventListener("click", (event) => {
+    if (event.target.closest(".check-add") && editingList) {
+      addRowAtEnd(editingList);
+      return;
+    }
+    const row = event.target.closest(".check-row");
+    if (row && editingList?.contains(row)) {
+      // В режиме правки тап по квадратику отмечает пункт, тап по тексту — ставит каретку.
+      if (event.clientX < row.getBoundingClientRect().left + 30) toggleRow(row);
+      return;
+    }
     bodyInput.querySelectorAll("img.is-picked").forEach((node) => node.classList.remove("is-picked"));
     const img = event.target.closest("img.note-img");
     pickedImage = img || null;
@@ -1140,7 +1531,11 @@ function bindDrawer() {
   bodyInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      saveDraft();
+      finishEditor();
+      return;
+    }
+    if (event.target.closest?.(".checklist")) {
+      onRowKey(event);
       return;
     }
     if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.metaKey) return;
@@ -1255,6 +1650,11 @@ export function mount(parent) {
           <p class="field-error" id="editor-label"></p>
           <div class="body-input is-empty" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Текст" aria-label="Текст"></div>
           <input type="file" accept="image/*" hidden data-image-file>
+          <div class="checklist-tools" hidden>
+            <button type="button" data-cl="edit" aria-label="Редактировать список"></button>
+            <button type="button" data-cl="text" aria-label="Превратить в текст"></button>
+            <button type="button" data-cl="delete" aria-label="Удалить список"></button>
+          </div>
           <div class="text-dock" aria-label="Настройки текста">
             <div class="text-dock-masters">
               <button type="button" class="dock-btn" data-tool="list" aria-label="Тип списка">${icons.bullets}</button>
@@ -1324,14 +1724,10 @@ export function mount(parent) {
             </div>
           </div>
         </section>
-        <div class="check-split" data-check-split role="separator" aria-orientation="horizontal" aria-label="Высота чеклиста"><span></span></div>
-        <section class="check-card" aria-label="Чеклист">
-          <div class="body-preview body-render" aria-live="polite"></div>
-        </section>
-        <div class="editor-progress"></div>
+        <div class="editor-progress" aria-live="polite"></div>
       </div>
       <div class="editor-settings">
-        <button type="button" class="back" data-settings-back>К записи</button>
+        <button type="button" class="date-plain sheet-back" data-settings-back>Назад</button>
         <p class="field-error"></p>
         <p class="hint">Тип</p>
         <div class="segmented">
@@ -1368,7 +1764,7 @@ export function mount(parent) {
         </div>
       </div>
       <div class="when-sheet" hidden>
-        <button type="button" class="date-plain when-back" data-when-back>Назад</button>
+        <button type="button" class="date-plain sheet-back" data-when-back>Назад</button>
         <div class="when-day">
           <div class="when-month">
             <button type="button" class="date-plain" data-month="-1" aria-label="Предыдущий месяц">‹</button>
@@ -1379,9 +1775,9 @@ export function mount(parent) {
           <div class="when-grid"></div>
         </div>
         <div class="when-clock">
-          <p class="when-clock-readout">00:00</p>
+          <input class="when-clock-readout" type="text" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Время, часы и минуты" value="00:00" />
           <div class="clock-face" data-clock>
-            ${Array.from({ length: 24 }, (_, index) => `<span class="clock-tick" style="transform: rotate(${index * 15}deg)"><i></i></span>`).join("")}
+            ${Array.from({ length: 60 }, (_, index) => `<span class="clock-tick${index % 5 ? "" : " is-hour"}" style="transform: rotate(${index * 6}deg)"><i></i></span>`).join("")}
             <div class="clock-hand hour"></div>
             <div class="clock-hand minute"></div>
             <i class="clock-cap"></i>
@@ -1421,6 +1817,21 @@ export function mount(parent) {
     const card = event.target.closest(".card");
     if (!card) return;
     const id = card.dataset.id;
+    const checkRow = event.target.closest(".checklist .check-row");
+    if (checkRow) {
+      event.preventDefault();
+      event.stopPropagation();
+      const index = [...card.querySelectorAll(".checklist .check-row")].indexOf(checkRow);
+      update((state) => {
+        const entry = state.entries.find((item) => item.id === id);
+        if (entry) {
+          entry.body = toggleCheckRow(entry.body, index);
+          entry.updatedAt = Date.now();
+        }
+        return state;
+      });
+      return;
+    }
     const checkLine = event.target.closest("[data-check-line]")?.dataset.checkLine;
     if (checkLine != null) {
       event.preventDefault();
@@ -1478,7 +1889,7 @@ export function keydown(event) {
   if (!active || drawerEl.classList.contains("is-open")) {
     if (event.key === "Escape" && drawerEl.classList.contains("is-open")) {
       event.preventDefault();
-      requestClose();
+      if (!closeEditorLayer()) requestClose();
     }
     return;
   }
@@ -1493,4 +1904,29 @@ export function keydown(event) {
 
 export function isEditorOpen() {
   return drawerEl?.classList.contains("is-open");
+}
+
+/** Закрывает верхний слой редактора (дата, настройки, правка чеклиста). false — слоёв нет. */
+function closeEditorLayer() {
+  if (whenPick) {
+    commitWhen();
+    return true;
+  }
+  const drawer = drawerEl.querySelector(".drawer");
+  if (drawer?.classList.contains("is-settings")) {
+    drawer.classList.remove("is-settings");
+    return true;
+  }
+  if (activeList) {
+    clearChecklistSelection();
+    return true;
+  }
+  return false;
+}
+
+/** Системный «назад»: снимает слой редактора, а из самой записи выходит с сохранением. */
+export function handleBack() {
+  if (!isEditorOpen()) return false;
+  if (!closeEditorLayer()) finishEditor();
+  return true;
 }

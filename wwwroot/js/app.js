@@ -7,7 +7,7 @@ import * as wishlist from "./wishlist.js";
 import { isMobileApp } from "./platform.js";
 import { bootstrap, clearCosmos, getState, subscribe, update } from "./store.js";
 import { syncStatus } from "./sync.js";
-import { confirmDialog, icons, initial, isModalOpen, isTyping, startOfDay, toast } from "./ui.js";
+import { confirmDialog, dismissModal, icons, initial, isModalOpen, isTyping, startOfDay, toast } from "./ui.js";
 
 const app = document.querySelector("#app");
 const mobile = isMobileApp();
@@ -113,8 +113,14 @@ function mobileShell() {
 }
 
 let current = "constellation";
+// Вкладки, по которым ходили: системный «назад» возвращает на предыдущую.
+const visited = [];
 
-function show(view) {
+function show(view, { fromBack = false } = {}) {
+  if (!fromBack && shellReady && view !== current) {
+    visited.push(current);
+    if (visited.length > 30) visited.shift();
+  }
   current = view;
   for (const button of app.querySelectorAll(".nav-btn")) {
     const on = button.dataset.view === view;
@@ -345,7 +351,38 @@ function syncKeyboard() {
   document.body.classList.toggle("is-keyboard", keyboard > 72);
 }
 
+/**
+ * Системный «назад» (жест или кнопка Android). Снимает верхний слой — диалог, редактор,
+ * профиль, шторку созвездия — или возвращает на прошлую вкладку.
+ * false — возвращаться некуда, приложение можно закрыть.
+ */
+function handleBack() {
+  if (!shellReady) return false;
+  if (isModalOpen()) {
+    dismissModal();
+    return true;
+  }
+  if (archive.handleBack()) return true;
+  const popover = app.querySelector(".popover");
+  if (popover && !popover.hidden) {
+    popover.hidden = true;
+    return true;
+  }
+  if (current === "constellation" && constellation.isSheetOpen()) {
+    constellation.closeSheet();
+    return true;
+  }
+  const previous = visited.pop();
+  if (previous) {
+    if (previous === "constellation") constellation.closeSheet();
+    show(previous, { fromBack: true });
+    return true;
+  }
+  return false;
+}
+
 function wireMobile() {
+  window.VoidPrismBack = handleBack;
   window.VoidPrismOpen = (payload) => {
     if (!shellReady) {
       window.__voidprismPending = payload;

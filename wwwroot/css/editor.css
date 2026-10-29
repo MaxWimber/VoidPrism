@@ -25,7 +25,7 @@
 }
 
 .editor-main.has-checks {
-  grid-template-rows: 48px minmax(140px, 1fr) 22px var(--check-h, 132px) 68px;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
 }
 
 body.is-keyboard .editor-main,
@@ -34,28 +34,9 @@ body.is-keyboard .editor-main.has-checks {
   padding-bottom: calc(32px + var(--keyboard, 0px));
 }
 
-body.is-keyboard .check-card,
 body.is-keyboard .editor-progress,
-body.is-keyboard .check-split,
-.editor-main:not(.has-checks) .check-card,
-.editor-main:not(.has-checks) .editor-progress,
-.editor-main:not(.has-checks) .check-split {
+.editor-main:not(.has-checks) .editor-progress {
   display: none !important;
-}
-
-.check-split {
-  display: flex;
-  align-items: center;
-  touch-action: none;
-  padding: 0 2px;
-}
-
-.check-split span {
-  display: block;
-  width: 100%;
-  height: 2px;
-  border-radius: 2px;
-  background: rgba(232, 238, 252, 0.38);
 }
 
 .editor-top,
@@ -135,7 +116,6 @@ body.is-keyboard .check-split,
 }
 
 .text-card,
-.check-card,
 .editor-progress {
   min-height: 0;
   overflow: hidden;
@@ -143,6 +123,7 @@ body.is-keyboard .check-split,
 }
 
 .text-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   border-radius: 18px;
@@ -358,32 +339,14 @@ body:not(.is-mobile-app) .text-dock-panel {
 .dock-color.mint { background: #86efac; }
 .dock-color.ink { background: #e8eefc; }
 
-.check-card {
-  height: 100%;
-  border-radius: 18px;
-  background: rgba(8, 10, 24, 0.55);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.check-card .body-preview {
-  height: 100%;
-  max-height: 100%;
-  margin: 0;
-  overflow: auto;
-  border: 0;
-  border-radius: 18px;
-  background: transparent;
-  box-sizing: border-box;
-}
-
 .editor-progress {
-  height: 100%;
+  min-height: 0;
 }
 
 .editor-sheet .progress-badge {
   width: 100%;
   height: 100%;
-  max-height: 68px;
+  max-height: 64px;
   margin: 0;
   overflow: hidden;
   box-sizing: border-box;
@@ -394,10 +357,8 @@ body:not(.is-mobile-app) .text-dock-panel {
   inset: 0;
   z-index: 5;
   overflow: auto;
-  padding: 16px 16px 24px;
-  background: rgba(8, 10, 24, 0.62);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  padding: 12px 16px 24px;
+  background: #0a0c1c;
 }
 
 .when-sheet[hidden],
@@ -422,9 +383,24 @@ body:not(.is-mobile-app) .text-dock-panel {
 }
 
 .when-clock-readout {
-  margin: 8px 0 0;
+  display: block;
+  width: 132px;
+  margin: 10px auto 0;
+  padding: 2px 6px;
+  border: 0;
+  border-bottom: 1px dashed rgba(186, 204, 255, 0.28);
+  border-radius: 0;
+  background: transparent;
   text-align: center;
-  font-size: 28px;
+  font-size: 32px;
+  line-height: 1.15;
+  outline: none;
+  cursor: text;
+}
+
+.when-clock-readout:focus {
+  border-bottom-color: var(--cyan);
+  color: var(--cyan);
 }
 
 .when-week,
@@ -459,6 +435,7 @@ body:not(.is-mobile-app) .text-dock-panel {
 }
 
 .when-clock {
+  --clock: min(256px, 70vw);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -467,9 +444,9 @@ body:not(.is-mobile-app) .text-dock-panel {
 
 .clock-face {
   position: relative;
-  width: 196px;
-  height: 196px;
-  margin-top: 8px;
+  width: var(--clock);
+  height: var(--clock);
+  margin-top: 10px;
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 42%, rgba(126, 231, 255, 0.18), rgba(12, 16, 38, 0.2) 58%),
@@ -480,23 +457,33 @@ body:not(.is-mobile-app) .text-dock-panel {
   touch-action: none;
 }
 
+/* Деление — палочка от центра до края; поворот на 6° на каждую минуту. */
 .clock-tick {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 0;
   width: 0;
-  height: 78px;
-  transform-origin: 50% 0;
+  height: 50%;
+  transform-origin: 50% 100%;
+  pointer-events: none;
 }
 
 .clock-tick i {
   position: absolute;
-  left: -2px;
-  bottom: 0;
-  width: 4px;
-  height: 8px;
-  border-radius: 4px;
-  background: rgba(186, 204, 255, 0.55);
+  left: -1px;
+  top: 7px;
+  width: 2px;
+  height: 6px;
+  border-radius: 2px;
+  background: rgba(186, 204, 255, 0.38);
+}
+
+.clock-tick.is-hour i {
+  left: -1.5px;
+  top: 6px;
+  width: 3px;
+  height: 12px;
+  background: rgba(214, 226, 255, 0.82);
 }
 
 .clock-hand {
@@ -509,17 +496,17 @@ body:not(.is-mobile-app) .text-dock-panel {
 
 .clock-hand.hour {
   width: 4px;
-  height: 52px;
+  height: calc(var(--clock) * 0.27);
   margin-left: -2px;
-  margin-top: -52px;
+  margin-top: calc(var(--clock) * -0.27);
   background: #eef2ff;
 }
 
 .clock-hand.minute {
   width: 2px;
-  height: 74px;
+  height: calc(var(--clock) * 0.42);
   margin-left: -1px;
-  margin-top: -74px;
+  margin-top: calc(var(--clock) * -0.42);
   background: #7ee7ff;
   box-shadow: 0 0 10px rgba(126, 231, 255, 0.7);
 }
@@ -550,10 +537,8 @@ body:not(.is-mobile-app) .text-dock-panel {
   inset: 0;
   z-index: 3;
   overflow: auto;
-  padding: 16px 16px 24px;
-  background: rgba(8, 10, 24, 0.62);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  padding: 12px 16px 24px;
+  background: #0a0c1c;
   flex-direction: column;
   gap: 10px;
 }
@@ -562,12 +547,13 @@ body:not(.is-mobile-app) .text-dock-panel {
   display: flex;
 }
 
-.editor-settings .back {
+/* «Назад» в шторках даты и настроек — одна и та же кнопка в левом верхнем углу. */
+.sheet-back {
   align-self: flex-start;
-  border: 0;
-  background: transparent;
+  display: block;
+  margin: 0 0 8px -8px;
   color: var(--cyan);
-  padding: 0 0 4px;
+  font-size: 15px;
 }
 
 .settings-extra {
@@ -575,4 +561,130 @@ body:not(.is-mobile-app) .text-dock-panel {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* --- Блок чеклиста: в тексте заметки и на карточках --- */
+
+.checklist {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: rgba(126, 231, 255, 0.05);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: normal;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease, padding 0.15s ease;
+}
+
+.check-row {
+  position: relative;
+  min-height: 1.5em;
+  padding: 5px 4px 5px 30px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.check-row::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(5px + 0.7em - 9px);
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1.5px rgba(196, 181, 253, 0.7);
+}
+
+.check-row.is-done {
+  color: var(--faint);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.28);
+}
+
+.check-row.is-done::before {
+  box-shadow: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071018' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8'/%3E%3C/svg%3E") center / 14px no-repeat,
+    linear-gradient(160deg, var(--mint), var(--cyan));
+}
+
+.checklist.is-lifted {
+  padding-right: 54px;
+  box-shadow: inset 0 0 0 1.5px var(--cyan), 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.checklist.is-dragging {
+  opacity: 0.6;
+}
+
+.checklist.is-editing .check-row {
+  cursor: text;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+  border-bottom: 1px dashed rgba(186, 204, 255, 0.16);
+}
+
+.checklist.is-editing .check-row:focus {
+  border-bottom-color: var(--cyan);
+}
+
+.check-add {
+  justify-self: start;
+  margin: 4px 0 2px 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 13px;
+}
+
+.body-input > .drop-before { box-shadow: 0 -3px 0 -1px var(--cyan); }
+.body-input > .drop-after { box-shadow: 0 3px 0 -1px var(--cyan); }
+
+.checklist-tools {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklist-tools[hidden] {
+  display: none !important;
+}
+
+.checklist-tools button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  color: var(--ink);
+  background: #151a33;
+  box-shadow: inset 0 0 0 1px var(--line), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.checklist-tools button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.checklist-tools [data-cl="delete"] {
+  color: var(--rose);
+}
+
+.card-body .checklist,
+.wish-body .checklist {
+  padding: 4px 6px;
 }

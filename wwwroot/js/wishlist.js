@@ -1,5 +1,5 @@
 import { bridge } from "./bridge.js";
-import { plainExcerpt, renderBody } from "./lists.js";
+import { cardBodyHtml, plainExcerpt } from "./lists.js";
 import { getState, update } from "./store.js";
 import { esc, formatDate, icons } from "./ui.js";
 
@@ -52,7 +52,7 @@ function kindLabel() {
 
 function cardHtml(entry) {
   const tags = entry.tags.map((tag) => `<span class="mini-tag">#${esc(tag)}</span>`).join("");
-  const bodyHtml = renderBody(entry.body, { compact: true });
+  const bodyHtml = cardBodyHtml(entry.body);
   const fallback = plainExcerpt(entry.body) || "Без описания";
   const priority = Math.min(3, Math.max(1, entry.priority || 2));
   const stars = "✦".repeat(priority) + "✧".repeat(3 - priority);
