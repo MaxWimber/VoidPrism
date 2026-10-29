@@ -1,63 +1,33 @@
 import { uid } from "./ui.js";
-import { bridge } from "./bridge.js";
+import { isMobileApp } from "./platform.js";
+import * as localVault from "./vault-local.js";
+import * as serverVault from "./vault-server.js";
 
+const vault = isMobileApp() ? localVault : serverVault;
 const listeners = new Set();
 let state = null;
 let saveTimer = 0;
-let saving = false;
-let pending = false;
+let dirty = false;
 
 function valid(data) {
   return Boolean(data && data.profile && Array.isArray(data.entries) && Array.isArray(data.boards) && data.boards.length);
-}
-
-function csrfToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.content || "";
 }
 
 function emit() {
   listeners.forEach((listener) => listener(state));
 }
 
-async function flush() {
-  if (saving) {
-    pending = true;
-    return;
-  }
-  saving = true;
-  pending = false;
-  const payload = structuredClone(state);
-  try {
-    const response = await fetch("/api/state/", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrfToken(),
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error(String(response.status));
-  } catch {
-    bridge.onError?.("Не удалось записать изменения в базу VoidPrism.");
-    saving = false;
-    return;
-  }
-  saving = false;
-  if (pending) void flush();
-}
-
 function scheduleSave() {
-  pending = true;
+  dirty = true;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    void flush();
-  }, 200);
+    dirty = false;
+    void vault.save(state);
+  }, vault.SAVE_DELAY);
 }
 
 export async function bootstrap() {
-  const response = await fetch("/api/state/");
-  if (!response.ok) throw new Error("state");
-  const data = await response.json();
+  const data = await vault.load(valid);
   if (!valid(data)) throw new Error("shape");
   state = data;
 }
@@ -135,15 +105,8 @@ export function themesOf(entries) {
 }
 
 window.addEventListener("pagehide", () => {
-  if (!state || !pending) return;
+  if (!state || !dirty) return;
   clearTimeout(saveTimer);
-  fetch("/api/state/", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": csrfToken(),
-    },
-    body: JSON.stringify(state),
-    keepalive: true,
-  });
+  dirty = false;
+  vault.saveOnExit(state);
 });

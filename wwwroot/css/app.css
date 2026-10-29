@@ -1295,6 +1295,18 @@ svg.is-live .guide {
   overflow: auto;
 }
 
+.calendar-view.is-day .cal-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.calendar-view.is-day .cal-board {
+  display: none;
+}
+
+.calendar-view.is-day .cal-panel {
+  border-left: 0;
+}
+
 .cal-panel h2 {
   margin: 0;
   font-family: var(--display);

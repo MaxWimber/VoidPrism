@@ -1,3 +1,5 @@
+import { attachPinch } from "./pinch.js";
+import { isMobileApp } from "./platform.js";
 import { blankBoard, getState, update } from "./store.js";
 import { confirmDialog, icons, uid } from "./ui.js";
 
@@ -48,6 +50,7 @@ let selectedLink = null;
 let linkFrom = null;
 let rubber = null;
 let pointer = null;
+let pinchCtl = null;
 let spaceDown = false;
 let undo = [];
 let redo = [];
@@ -515,6 +518,7 @@ function placeNode(kind, rect) {
 }
 
 function onPointerMove(event) {
+  if (pinchCtl?.isPinching()) return;
   if (linkFrom && !pointer) {
     const rect = viewport.getBoundingClientRect();
     rubber = { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -571,6 +575,10 @@ function onPointerMove(event) {
 }
 
 function endPointer() {
+  if (pinchCtl?.isPinching()) {
+    pointer = null;
+    return;
+  }
   if (!pointer) return;
   const current = pointer;
   pointer = null;
@@ -702,7 +710,8 @@ function zoomAt(clientX, clientY, factor) {
   const sy = clientY - rect.top;
   const wx = cam.x + sx / cam.z;
   const wy = cam.y + sy / cam.z;
-  cam.z = Math.min(2.4, Math.max(0.25, cam.z * factor));
+  const maxZ = isMobileApp() ? 4 : 2.4;
+  cam.z = Math.min(maxZ, Math.max(0.25, cam.z * factor));
   cam.x = wx - sx / cam.z;
   cam.y = wy - sy / cam.z;
   applyCamera();
@@ -743,7 +752,9 @@ export function mount(parent) {
       <div class="board-hint">
         <div>
           <strong>Пустое полотно</strong>
-          Выберите фигуру снизу и поставьте её кликом. Колёсико меняет масштаб, пробел двигает обзор.
+          ${isMobileApp()
+            ? "Выберите фигуру снизу и поставьте её кликом. Двумя пальцами — масштаб, одним — обзор."
+            : "Выберите фигуру снизу и поставьте её кликом. Колёсико меняет масштаб, пробел двигает обзор."}
         </div>
       </div>
     </div>
@@ -807,7 +818,18 @@ export function mount(parent) {
     if (button) beginRename(button.dataset.board, button);
   });
 
+  pinchCtl = attachPinch(viewport, {
+    onPinchStart: () => {
+      pointer = null;
+      viewport.classList.remove("is-panning");
+    },
+    onZoom: (x, y, factor) => {
+      zoomAt(x, y, factor);
+    },
+  });
+
   viewport.addEventListener("pointerdown", (event) => {
+    if (pinchCtl?.pointerCount() >= 2 || pinchCtl?.isPinching()) return;
     if (event.target.closest(".node") || event.target.closest(".hit")) return;
     if (event.button === 1 || tool === "hand" || spaceDown) {
       event.preventDefault();
@@ -823,6 +845,11 @@ export function mount(parent) {
       linkFrom = null;
       rubber = null;
       paint();
+      return;
+    }
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+      startPan(event);
       return;
     }
     selectedId = null;

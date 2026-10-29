@@ -18,6 +18,14 @@ function parseLine(line) {
   return { type: "text", indent: "", text: line };
 }
 
+export function plainBody(body) {
+  const raw = String(body || "");
+  if (!/<[a-z!]/i.test(raw)) return raw.replace(/\r\n/g, "\n");
+  const box = document.createElement("div");
+  box.innerHTML = raw;
+  return box.innerText.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n");
+}
+
 function prefixFor(type, n = 1) {
   if (type === "bullet") return "- ";
   if (type === "number") return `${n}. `;
@@ -65,6 +73,33 @@ export function toggleList(textarea, type) {
   textarea.setSelectionRange(cursor, cursor);
   textarea.focus();
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+export function rewriteListLines(allLines, from, to, type) {
+  const start = Math.max(0, from);
+  const end = Math.min(allLines.length - 1, to);
+  const lines = allLines.slice(start, end + 1);
+  const allSame = lines.length > 0 && lines.every((line) => parseLine(line).type === type);
+  let nextN = 1;
+  const numberedBefore = allLines.slice(0, start).reverse().find((line) => parseLine(line).type === "number");
+  if (numberedBefore) nextN = parseLine(numberedBefore).n + 1;
+  const next = lines.map((line, index) => {
+    if (allSame) return stripPrefix(line);
+    const text = stripPrefix(line);
+    if (type === "number") return `${prefixFor("number", nextN + index)}${text}`;
+    return `${prefixFor(type)}${text}`;
+  });
+  return allLines.slice(0, start).concat(next, allLines.slice(end + 1));
+}
+
+export function listEnterInsert(line) {
+  const parsed = parseLine(line);
+  if (parsed.type === "text") return null;
+  if (!parsed.text.trim()) return "";
+  if (parsed.type === "bullet") return `${parsed.indent}- `;
+  if (parsed.type === "check") return `${parsed.indent}- [ ] `;
+  if (parsed.type === "number") return `${parsed.indent}${parsed.n + 1}. `;
+  return null;
 }
 
 export function handleListEnter(textarea, event) {
@@ -116,8 +151,8 @@ function sameListFamily(a, b) {
   return (a === "bullet" || a === "check") && (b === "bullet" || b === "check");
 }
 
-export function renderBody(body, { compact = false } = {}) {
-  const lines = String(body || "").replace(/\r\n/g, "\n").split("\n");
+export function renderBody(body, { compact = false, checksOnly = false } = {}) {
+  const lines = plainBody(body).split("\n");
   if (!lines.length || (lines.length === 1 && !lines[0].trim())) {
     return compact ? "" : `<p class="body-empty">Пустая запись</p>`;
   }
@@ -129,6 +164,10 @@ export function renderBody(body, { compact = false } = {}) {
 
   while (i < lines.length) {
     const parsed = parseLine(lines[i]);
+    if (checksOnly && parsed.type !== "check") {
+      i += 1;
+      continue;
+    }
     if (isListType(parsed.type)) {
       if (listBudget <= 0) {
         parts.push(`<p class="body-more">…</p>`);
@@ -138,6 +177,7 @@ export function renderBody(body, { compact = false } = {}) {
       const collected = [];
       while (i < lines.length) {
         const item = parseLine(lines[i]);
+        if (checksOnly && item.type !== "check") break;
         if (!isListType(item.type) || !sameListFamily(parsed.type, item.type)) break;
         collected.push({ ...item, lineIndex: i });
         i += 1;
@@ -177,24 +217,40 @@ export function renderBody(body, { compact = false } = {}) {
 }
 
 export function plainExcerpt(body) {
-  return String(body || "")
+  return plainBody(body)
     .replace(/^(\s*)(?:[-*•]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 export function toggleCheckLine(body, lineIndex) {
-  const lines = String(body || "").replace(/\r\n/g, "\n").split("\n");
+  const lines = plainBody(body).split("\n");
   const line = lines[lineIndex];
   if (line == null) return body;
   const parsed = parseLine(line);
   if (parsed.type !== "check") return body;
-  lines[lineIndex] = `${parsed.indent}- [${parsed.done ? " " : "x"}] ${parsed.text}`;
+  const next = `${parsed.indent}- [${parsed.done ? " " : "x"}] ${parsed.text}`;
+  if (!/<[a-z!]/i.test(String(body || ""))) {
+    lines[lineIndex] = next;
+    return lines.join("\n");
+  }
+  const box = document.createElement("div");
+  box.innerHTML = body;
+  const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (node.nodeValue.includes(line)) {
+      node.nodeValue = node.nodeValue.replace(line, next);
+      return box.innerHTML;
+    }
+    node = walker.nextNode();
+  }
+  lines[lineIndex] = next;
   return lines.join("\n");
 }
 
 export function checklistProgress(body) {
-  const lines = String(body || "").replace(/\r\n/g, "\n").split("\n");
+  const lines = plainBody(body).split("\n");
   let total = 0;
   let done = 0;
   for (const line of lines) {

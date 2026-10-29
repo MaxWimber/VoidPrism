@@ -25,6 +25,7 @@ const MODES = [
 const VIEWS = [
   ["month", "Месяц"],
   ["week", "Неделя"],
+  ["day", "День"],
 ];
 
 let root;
@@ -180,7 +181,9 @@ function paintChrome() {
     <button type="button" class="chip slim ${journalField === "createdAt" ? "is-on" : ""}" data-journal="createdAt">по созданию</button>
     <button type="button" class="chip slim ${journalField === "updatedAt" ? "is-on" : ""}" data-journal="updatedAt">по изменению</button>
   `;
-  if (view === "month") {
+  if (view === "day") {
+    titleEl.textContent = formatDayTitle(cursor);
+  } else if (view === "month") {
     titleEl.textContent = formatMonthTitle(cursor);
   } else {
     const start = mondayOf(cursor);
@@ -323,11 +326,21 @@ function paintPanel(map) {
 
 export function render() {
   if (!root || !active) return;
+  root.classList.toggle("is-day", view === "day");
   paintChrome();
   const map = byDay(visibleEntries());
   if (view === "month") paintMonth(map);
-  else paintWeek(map);
+  else if (view === "week") paintWeek(map);
+  else boardEl.innerHTML = "";
   paintPanel(map);
+}
+
+export function openDay(ts) {
+  mode = "plan";
+  view = "day";
+  cursor = startOfDay(ts || Date.now());
+  selectedDay = dayKey(cursor);
+  if (active) render();
 }
 
 export function mount(parent) {
@@ -396,6 +409,8 @@ export function mount(parent) {
       const date = new Date(cursor);
       date.setMonth(date.getMonth() + step);
       cursor = startOfDay(date.getTime());
+    } else if (view === "day") {
+      cursor = addDays(cursor, step);
     } else {
       cursor = addDays(mondayOf(cursor), step * 7);
     }
