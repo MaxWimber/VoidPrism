@@ -1,0 +1,655 @@
+/* Mobile shell overrides for VoidPrism Android WebView */
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+:root {
+  --safe-top: 36px;
+  --safe-bottom: 28px;
+  --nav-block: calc(88px + var(--safe-bottom, 28px));
+}
+
+body.is-mobile-app {
+  padding: 0;
+}
+
+#app {
+  display: block !important;
+  position: relative !important;
+  height: 100% !important;
+  min-height: 100dvh !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.mobile-top { display: none !important; }
+
+.nav-bottom {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  z-index: 50 !important;
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 0;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 6px 2px calc(12px + var(--safe-bottom, 28px)) !important;
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-right: 0 !important;
+  background: rgba(7, 8, 20, 0.96) !important;
+  backdrop-filter: blur(16px);
+  flex-direction: row !important;
+  overflow: visible !important;
+  order: unset !important;
+  align-items: stretch;
+}
+
+.nav-bottom .nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  min-width: 0;
+  padding: 6px 1px 4px;
+  border-radius: 12px;
+  font-size: 9px;
+  letter-spacing: 0;
+  color: var(--muted);
+  background: transparent;
+}
+
+.nav-bottom .nav-btn.is-on {
+  color: var(--ink);
+  background: rgba(126, 231, 255, 0.1);
+}
+
+.nav-bottom .nav-btn svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.nav-bottom .nav-btn span {
+  display: block !important;
+  font-size: 9px;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-bottom .nav-me .nav-avatar,
+.nav-bottom .me-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(126, 231, 255, 0.35), rgba(196, 181, 253, 0.45));
+  box-shadow: inset 0 0 0 1px rgba(186, 204, 255, 0.25);
+  flex: 0 0 auto;
+}
+
+.stage {
+  position: absolute !important;
+  top: var(--safe-top, 36px);
+  left: 0;
+  right: 0;
+  bottom: var(--nav-block);
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.popover {
+  position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
+  top: calc(12px + var(--safe-top, 36px)) !important;
+  bottom: auto !important;
+  width: auto !important;
+  z-index: 60 !important;
+  max-height: calc(100dvh - var(--safe-top, 36px) - var(--nav-block) - 24px);
+  overflow: auto;
+}
+
+.sync-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 6px;
+  background: rgba(126, 231, 255, 0.05);
+}
+
+.check.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.view {
+  min-height: 0;
+}
+
+.archive-view.is-on,
+.calendar-view.is-on,
+.wishlist-view.is-on,
+.constellation-view.is-on,
+.canvas-view.is-on {
+  padding: 12px 12px 10px !important;
+  gap: 10px !important;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.archive-view.is-on,
+.wishlist-view.is-on,
+.calendar-view.is-on {
+  overflow: hidden !important;
+}
+
+h1 {
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+}
+
+.eyebrow {
+  margin: 0 0 4px !important;
+  position: relative;
+  z-index: 1;
+}
+
+.lede {
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: none;
+  margin: 4px 0 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.view-head {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  position: relative;
+  z-index: 1;
+}
+
+.view-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.view-head .btn,
+.cal-head-tools .btn {
+  width: auto !important;
+  flex: none;
+  align-self: flex-start;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 13px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.cal-head-tools {
+  width: auto;
+  flex: none;
+  align-items: flex-end !important;
+  gap: 6px !important;
+}
+
+.cal-head-tools .segmented {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cal-toolbar {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  margin: 0 !important;
+}
+
+.cal-toolbar .filters {
+  margin: 0;
+}
+
+.cal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px !important;
+  min-width: 0 !important;
+  width: 100%;
+}
+
+.cal-title {
+  width: 100%;
+  margin: 2px 0 0 !important;
+  font-size: 16px !important;
+}
+
+.calendar-view.is-day .cal-layout {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+.calendar-view.is-day .cal-board {
+  display: none !important;
+}
+
+.calendar-view.is-day .cal-panel {
+  border-top: 0 !important;
+}
+
+.cal-layout {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: minmax(0, 1fr) minmax(108px, 32%) !important;
+  gap: 0 !important;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cal-board {
+  min-height: 0;
+  overflow: auto;
+}
+
+.cal-panel {
+  border-left: 0 !important;
+  border-top: 1px solid var(--line);
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cal-cell {
+  min-height: 58px !important;
+  padding: 4px !important;
+  overflow: hidden;
+}
+
+.cal-item {
+  font-size: 9px !important;
+  padding: 2px 4px !important;
+  max-width: 100%;
+}
+
+.cal-weekdays {
+  gap: 4px;
+}
+
+.archive-layout {
+  grid-template-columns: 1fr !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.search {
+  flex: 0 0 auto !important;
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 12px;
+}
+
+.tag-rail {
+  flex: none;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  max-height: none !important;
+  width: 100%;
+  max-width: 100%;
+  gap: 6px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.tag-rail::-webkit-scrollbar { display: none; }
+
+.tag-rail button {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  white-space: nowrap;
+}
+
+.cards-scroll,
+.wish-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.stats,
+.wish-stats,
+.stats-four {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  max-width: none !important;
+  gap: 8px !important;
+}
+
+.wish-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.stat {
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px 8px;
+}
+
+.stat b, .stat span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.welcome {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.welcome p {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.constellation-view.is-on {
+  padding: 8px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px !important;
+}
+
+.constellation-layout {
+  position: relative;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.sky {
+  min-height: 260px !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sky-tools {
+  position: absolute;
+  top: 8px !important;
+  right: 8px !important;
+  left: 8px !important;
+  width: auto !important;
+  max-width: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px !important;
+  z-index: 4;
+  box-sizing: border-box;
+}
+
+.sky-tools .btn,
+.sky-tools .mini {
+  flex: 0 0 auto;
+}
+
+.theme.is-picked .theme-dot,
+.star.is-picked .star-dot {
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 12px currentColor);
+}
+
+.dossier {
+  display: none !important;
+}
+
+.constellation-view.is-sheet .dossier {
+  display: flex !important;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  max-height: none !important;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+
+.canvas-view.is-on {
+  display: flex !important;
+  flex-direction: column;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.canvas-bar {
+  position: relative;
+  z-index: 2;
+  flex-wrap: wrap;
+  padding: 10px 10px 0 !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+.board-tabs {
+  width: 100%;
+  order: 1;
+}
+
+.bar-actions {
+  position: relative;
+  z-index: 2;
+  flex-wrap: wrap;
+  width: 100%;
+  order: 2;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.board-view {
+  position: relative;
+  z-index: 1;
+  margin: 8px 8px 4px !important;
+  border-radius: 16px !important;
+  flex: 1;
+  min-height: 0;
+}
+
+.tool-dock {
+  position: relative;
+  z-index: 2;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  gap: 6px;
+  padding: 8px 8px 10px !important;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.tool-dock::-webkit-scrollbar { display: none; }
+
+.tool-dock .tool {
+  flex: 0 0 auto;
+  min-width: 60px;
+}
+
+.wish-card,
+.card {
+  overflow: hidden;
+}
+
+.wish-top {
+  position: relative;
+  z-index: 1;
+}
+
+.wish-glow {
+  pointer-events: none;
+}
+
+.btn, .list-btn, .tool {
+  min-height: 36px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.drawer-back {
+  z-index: 70 !important;
+}
+
+.drawer-back.is-open {
+  align-items: stretch;
+  justify-content: center;
+  padding: var(--safe-top, 36px) 0 0;
+}
+
+.drawer {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 100%;
+  overflow: auto;
+  border-radius: 20px 20px 0 0;
+  padding: 14px 14px 12px !important;
+  gap: 10px !important;
+}
+
+.drawer-head {
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drawer-head .segmented {
+  max-width: none;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.title-input {
+  font-size: 22px !important;
+  padding: 4px 0 !important;
+}
+
+.body-input {
+  min-height: 96px;
+}
+
+.when-fields {
+  flex-wrap: wrap;
+}
+
+.when-input,
+.tag-input,
+.text-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tag-editor {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.drawer-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 4px !important;
+  padding: 10px 0 2px;
+  background: rgba(10, 12, 28, 0.98);
+  flex-wrap: wrap;
+}
+
+.drawer-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.drawer .btn {
+  width: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+
+.modal-back {
+  z-index: 80 !important;
+  padding-bottom: calc(20px + var(--nav-block));
+}
+
+.toast {
+  bottom: calc(12px + var(--nav-block)) !important;
+}
+
+.mini {
+  min-height: 34px;
+  min-width: 34px;
+}
