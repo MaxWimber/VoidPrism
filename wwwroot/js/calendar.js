@@ -447,9 +447,10 @@ function bindSwipes(area) {
         return;
       }
     }
+    swipe.last = swipe.axis === "x" ? dx : dy;
     const target = swipeTarget();
     if (!target) return;
-    const delta = swipe.axis === "x" ? dx : dy;
+    const delta = swipe.last;
     target.style.transition = "none";
     target.style.transform = offset(swipe.axis, `${delta * 0.6}px`);
   });
@@ -458,12 +459,15 @@ function bindSwipes(area) {
     const current = swipe;
     swipe = null;
     if (!current.axis) return;
-    const delta = current.axis === "x" ? event.clientX - current.x : event.clientY - current.y;
+    // При pointercancel координаты события ненадёжны — берём последний сдвиг из pointermove.
+    const delta = event.type === "pointerup"
+      ? (current.axis === "x" ? event.clientX - current.x : event.clientY - current.y)
+      : (current.last || 0);
     swallowClick = true;
     setTimeout(() => {
       swallowClick = false;
     }, 300);
-    if (event.type === "pointerup" && Math.abs(delta) >= SWIPE_COMMIT) {
+    if (Math.abs(delta) >= SWIPE_COMMIT) {
       // Палец влево/вверх — следующий период, вправо/вниз — предыдущий.
       slideTo(delta < 0 ? 1 : -1);
       return;

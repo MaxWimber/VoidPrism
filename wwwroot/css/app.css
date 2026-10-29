@@ -1371,9 +1371,15 @@ svg.is-live .guide {
   display: none !important;
 }
 
-.calendar-view.is-month .cal-layout { touch-action: pan-x; }
+/* Жест листания отдаём странице, прокрутку по другой оси оставляем браузеру.
+   touch-action действует только до ближайшего прокручиваемого предка, а сетка недели,
+   колонки дней и список дня сами прокручиваемые, — поэтому правило на всех вложенных. */
+.calendar-view.is-month .cal-layout,
+.calendar-view.is-month .cal-layout * { touch-action: pan-x; }
 .calendar-view.is-week .cal-layout,
-.calendar-view.is-day .cal-layout { touch-action: pan-y; }
+.calendar-view.is-week .cal-layout *,
+.calendar-view.is-day .cal-layout,
+.calendar-view.is-day .cal-layout * { touch-action: pan-y; }
 
 .calendar-view .cal-panel { padding-bottom: 88px; }
 
