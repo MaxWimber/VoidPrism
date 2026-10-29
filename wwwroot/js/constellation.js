@@ -540,30 +540,53 @@ function syncSheet() {
   root?.classList.toggle("is-sheet", sheet && Boolean(selected));
 }
 
-function identityMarkup(state, themes, entries, hidden) {
+function plural(n, one, few, many) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+function countChip(n, one, few, many) {
+  return `<span class="chip is-static"><b>${n}</b> ${plural(n, one, few, many)}</span>`;
+}
+
+/**
+ * Шапка досье: «Назад» слева (в приложении закрывает шторку, на сайте возвращает
+ * к «Карте личности»), справа — иконки действий.
+ */
+function dossierHead(docked, { back = true, actions = "" } = {}) {
+  const showBack = back && (!docked || selected);
+  if (!showBack && !actions) return "";
+  return `
+    <div class="dossier-head">
+      ${showBack ? `<button type="button" class="date-plain sheet-back" data-back>Назад</button>` : "<span></span>"}
+      <div class="dossier-tools">${actions}</div>
+    </div>`;
+}
+
+function identityMarkup(state, themes, entries, docked) {
   const openTasks = state.entries.filter((entry) => entry.kind === "task" && entry.status !== "done").length;
   const openWishes = state.entries.filter((entry) => entry.kind === "wish" && entry.status !== "done").length;
+  const orbits = themes.filter((theme) => theme.name !== "без темы").length;
   return `
-    <p class="eyebrow">Карта личности</p>
+    ${dossierHead(docked, { back: !docked })}
     <h2>${esc(state.profile.name || "Я")}</h2>
-    <label>Имя в центре</label>
-    <input class="text-input identity-name" maxlength="32" value="${esc(state.profile.name)}" />
-    <label>Короткая подпись</label>
-    <input class="text-input identity-epithet" maxlength="80" value="${esc(state.profile.epithet)}" />
-    <div class="stats stats-four">
-      <div class="stat"><b>${entries.length}</b><span>на карте</span></div>
-      <div class="stat"><b>${themes.filter((theme) => theme.name !== "без темы").length}</b><span>орбит</span></div>
-      <div class="stat"><b>${openTasks}</b><span>задач</span></div>
-      <div class="stat"><b>${openWishes}</b><span>желаний</span></div>
+    <input class="text-input identity-name" maxlength="32" value="${esc(state.profile.name)}" placeholder="Имя в центре" aria-label="Имя в центре" />
+    <input class="text-input identity-epithet" maxlength="80" value="${esc(state.profile.epithet)}" placeholder="Подпись" aria-label="Подпись" />
+    <div class="chip-row dossier-chips">
+      ${countChip(entries.length, "звезда", "звезды", "звёзд")}
+      ${countChip(orbits, "орбита", "орбиты", "орбит")}
+      ${countChip(openTasks, "задача", "задачи", "задач")}
+      ${countChip(openWishes, "желание", "желания", "желаний")}
     </div>
-    <p class="lede">Каждая заметка и задача — звезда. Орбиты-метки и звёзды можно расставить руками.</p>
     <div class="orbit-list">
       ${themes.map((theme) => {
         const progress = aggregateChecklistProgress(theme.entries);
-        return `<button type="button" data-pick="${esc(theme.name)}"><b>${esc(theme.name)}</b> <small>${theme.count}${progress ? ` · ${progress.percent}%` : ""}</small></button>`;
+        return `<button type="button" data-pick="${esc(theme.name)}"><i class="dot" style="color:${toneColor(toneFor(theme.name))}"></i><b>${esc(theme.name)}</b> <small>${theme.count}${progress ? ` · ${progress.percent}%` : ""}</small></button>`;
       }).join("") || "<p>Пока нет ни одной орбиты.</p>"}
-    </div>
-    ${hidden ? `<p class="hint">На небе видны ${MAX_THEMES} самых частых меток. Остальные ${hidden} — в этом списке.</p>` : ""}`;
+    </div>`;
 }
 
 function drawDossier() {
@@ -572,14 +595,13 @@ function drawDossier() {
   const state = getState();
   const { themes, pairs } = themesOf(state.entries);
   const entries = visibleEntries();
-  const hidden = Math.max(0, themes.length - MAX_THEMES);
   // На сайте досье — постоянная боковая панель: без выбора в ней «Карта личности».
   // В приложении это шторка, которая открывается только по явному выбору.
   const docked = !isMobileApp();
   const reset = () => {
     selected = null;
     sheet = false;
-    dossier.innerHTML = docked ? identityMarkup(state, themes, entries, hidden) : "";
+    dossier.innerHTML = docked ? identityMarkup(state, themes, entries, docked) : "";
     syncSheet();
   };
 
@@ -591,7 +613,7 @@ function drawDossier() {
   }
 
   if (!selected || selected.type === "core") {
-    dossier.innerHTML = identityMarkup(state, themes, entries, hidden);
+    dossier.innerHTML = identityMarkup(state, themes, entries, docked);
     syncSheet();
     return;
   }
@@ -601,22 +623,24 @@ function drawDossier() {
     if (!entry) {
       reset();
       return;
-    } else {
-      const progress = checklistProgress(entry.body);
-      dossier.innerHTML = `
-        ${docked ? `<button type="button" class="back" data-back>Космос</button>` : ""}
-        <p class="eyebrow">${entry.kind === "task" ? "Задача" : "Заметка"}</p>
-        <h2>${esc(entry.title)}</h2>
-        <p class="hint">${esc(formatDate(entry.updatedAt))}${entry.tags?.length ? ` · ${entry.tags.map((tag) => `#${tag}`).join(" ")}` : ""}</p>
-        ${progress ? progressBadgeHtml(progress) : ""}
-        <p class="lede">${esc(short(plainBody(entry.body).replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>
-        <div class="dossier-actions">
-          <button type="button" class="btn slim" data-open="${esc(entry.id)}">Открыть</button>
-          ${entry.tags?.[0] ? `<button type="button" class="btn ghost slim" data-pick="${esc(entry.tags[0])}">К орбите</button>` : ""}
-        </div>`;
-      syncSheet();
-      return;
     }
+    const progress = checklistProgress(entry.body);
+    const homeTag = entry.tags?.[0];
+    const actions = `
+      <button type="button" class="icon-tool" data-open="${esc(entry.id)}" title="Открыть запись" aria-label="Открыть запись">${icons.edit}</button>
+      ${homeTag ? `<button type="button" class="icon-tool" data-pick="${esc(homeTag)}" title="К орбите" aria-label="К орбите">${icons.orbit}</button>` : ""}`;
+    dossier.innerHTML = `
+      ${dossierHead(docked, { actions })}
+      <h2>${esc(entry.title)}</h2>
+      <div class="chip-row dossier-chips">
+        <span class="chip is-static">${entry.kind === "task" ? "Задача" : "Заметка"}</span>
+        <span class="chip is-static">${esc(formatDate(entry.updatedAt))}</span>
+        ${(entry.tags || []).map((tag) => `<button type="button" class="chip" data-pick="${esc(tag)}">#${esc(tag)}</button>`).join("")}
+      </div>
+      ${progress ? progressBadgeHtml(progress) : ""}
+      <p class="lede">${esc(short(plainBody(entry.body).replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>`;
+    syncSheet();
+    return;
   }
 
   if (selected.type !== "theme" || !themes.some((theme) => theme.name === selected.name)) {
@@ -628,13 +652,15 @@ function drawDossier() {
   const links = relatedNames(theme.name, pairs);
   const themeProgress = aggregateChecklistProgress(theme.entries);
   const themeEntries = theme.entries.filter((entry) => entry.kind === "note" || entry.kind === "task");
+  const actions = `<button type="button" class="icon-tool" data-filter title="Показать в архиве" aria-label="Показать в архиве">${icons.archive}</button>`;
   dossier.innerHTML = `
-    ${docked ? `<button type="button" class="back" data-back>Все орбиты</button>` : ""}
-    <p class="eyebrow">Орбита</p>
+    ${dossierHead(docked, { actions })}
     <h2>${esc(theme.name)}</h2>
-    <p class="lede">${themeEntries.length} ${themeEntries.length === 1 ? "запись на этой орбите" : "записей на этой орбите"}.</p>
+    <div class="chip-row dossier-chips">
+      ${countChip(themeEntries.length, "запись", "записи", "записей")}
+      ${links.map(([name]) => `<button type="button" class="chip" data-pick="${esc(name)}"><i class="dot" style="color:${toneColor(toneFor(name))}"></i>${esc(name)}</button>`).join("")}
+    </div>
     ${themeProgress ? progressBadgeHtml(themeProgress) : ""}
-    ${links.length ? `<p class="hint">Рядом: ${links.map(([name]) => esc(name)).join(", ")}</p>` : ""}
     <div class="orbit-list">
       ${themeEntries.map((entry) => {
         const progress = checklistProgress(entry.body);
@@ -646,13 +672,9 @@ function drawDossier() {
         </button>`;
       }).join("") || "<p>На орбите пока нет заметок и задач.</p>"}
     </div>
-    <div class="dossier-actions">
-      <button type="button" class="btn slim" data-new>Запись на эту орбиту</button>
-      <button type="button" class="btn ghost slim" data-filter>Показать в архиве</button>
-    </div>`;
+    <button type="button" class="fab dossier-fab" data-new title="Запись на эту орбиту" aria-label="Запись на эту орбиту">${icons.plus}</button>`;
   syncSheet();
 }
-
 function bindIdentity() {
   const name = dossier.querySelector(".identity-name");
   const epithet = dossier.querySelector(".identity-epithet");
@@ -998,6 +1020,7 @@ export function mount(parent) {
   dossier.addEventListener("click", (event) => {
     if (event.target.closest("[data-back]")) {
       selected = null;
+      sheet = false;
       render();
       return;
     }

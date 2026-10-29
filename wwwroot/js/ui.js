@@ -180,6 +180,8 @@ export function toast(message) {
 }
 
 export const icons = {
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19h3.5l9.7-9.7a1.8 1.8 0 0 0 0-2.5l-1-1a1.8 1.8 0 0 0-2.5 0L5 15.5V19z" stroke-linejoin="round"/><path d="m13.5 7 3.5 3.5"/></svg>`,
+  orbit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="18.6" cy="8.4" r="1.4" fill="currentColor" stroke="none"/></svg>`,
   plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>`,
   fit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" stroke-linecap="round"/><circle cx="12" cy="12" r="2.4"/></svg>`,
   compose: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 19 9.5-9.5M14.5 9.5l1.6-1.6" stroke-linecap="round"/><path d="M17 3.5v3M15.5 5h3M19.5 10v2M18.5 11h2M10 3.5v2M9 4.5h2" stroke-linecap="round"/></svg>`,

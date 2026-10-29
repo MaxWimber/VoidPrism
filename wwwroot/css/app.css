@@ -1260,11 +1260,77 @@ svg.is-live .guide {
   letter-spacing: -0.04em;
 }
 
-.dossier .back {
-  border: 0;
-  background: transparent;
-  color: var(--cyan);
-  padding: 0 0 8px;
+/* Досье созвездия в общей концепции: «Назад» и иконки сверху, название,
+   строка чипов-счётчиков, список, «+» внизу справа. */
+.dossier-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 6px;
+}
+
+.dossier-head .sheet-back {
+  margin: 0 0 0 -8px;
+}
+
+.dossier-tools {
+  display: flex;
+  gap: 6px;
+}
+
+.dossier h2 + .text-input,
+.dossier .identity-epithet {
+  margin-top: 10px;
+}
+
+.dossier-chips {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 4px;
+}
+
+.dossier .progress-badge {
+  margin-top: 10px;
+}
+
+.chip.is-static {
+  cursor: default;
+  color: var(--muted);
+}
+
+.chip.is-static b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.chip .dot,
+.orbit-list .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+
+.dossier-fab {
+  position: sticky;
+  bottom: 0;
+  margin: 16px 0 0 auto;
+}
+
+/* На сайте «+» неба виден рядом с панелью и уже ставит метку выбранной орбиты. */
+body:not(.is-mobile-app) .dossier-fab { display: none; }
+
+/* В шторке приложения досье — колонка во всю высоту: «+» прижимаем к низу. */
+.constellation-view.is-sheet .dossier-fab {
+  flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .stats {
