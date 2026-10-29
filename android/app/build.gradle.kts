@@ -3,7 +3,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Фронт общий с сайтом и живёт в ../wwwroot. Перед сборкой копируем его в assets/www,
+// рядом с index.html приложения (app/src/main/assets/www/index.html).
+val webAssetsDir = layout.buildDirectory.dir("generated/webAssets")
+
+val syncWebAssets by tasks.registering(Sync::class) {
+    from(rootProject.file("../wwwroot")) {
+        include("js/**", "css/**", "favicon.svg")
+    }
+    into(webAssetsDir.map { it.dir("www") })
+}
+
+tasks.named("preBuild") {
+    dependsOn(syncWebAssets)
+}
+
 android {
+    sourceSets["main"].assets.srcDir(webAssetsDir)
+
     namespace = "space.voidprism.app"
     compileSdk = 34
 

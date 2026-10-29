@@ -2,12 +2,21 @@
 
 Мобильная оболочка VoidPrism: Kotlin WebView + локальный UI.
 
+## Фронт
+
+JS и CSS общие с сайтом и лежат в `../wwwroot`. Перед сборкой Gradle-задача `syncWebAssets`
+копирует их в `app/build/generated/webAssets/www`, рядом с `app/src/main/assets/www/index.html`.
+Править фронт нужно только в `wwwroot`.
+
+Платформа определяется по классу `is-mobile-app` у `<body>` (`wwwroot/js/platform.js`):
+в приложении включаются нижняя навигация, `mobile.css`, хранение в `localStorage` и обработка виджетов.
+
 ## Данные
 
 - Хранятся в `localStorage` на устройстве (`voidprism.vault`).
 - При сохранении зеркалятся в SharedPreferences для виджетов рабочего стола.
 - Сайт и приложение **пока не синхронизируются** — в профиле есть заготовка «Синхронизация с сайтом — скоро».
-- Точка расширения: `app/src/main/assets/www/js/sync.js`.
+- Точка расширения: `wwwroot/js/sync.js`.
 
 ## Виджеты (1.0.4+)
 
