@@ -1,9 +1,13 @@
 import { bridge } from "./bridge.js";
-import { aggregateChecklistProgress, checklistProgress, progressArc, progressBadgeHtml } from "./lists.js";
+import { aggregateChecklistProgress, checklistProgress, plainBody, progressArc, progressBadgeHtml } from "./lists.js";
+import { attachPinch } from "./pinch.js";
+import { isMobileApp } from "./platform.js";
 import { getState, themesOf, update } from "./store.js";
 import { esc, formatDate, toneColor, toneFor, toast } from "./ui.js";
 
 const MAX_THEMES = 22;
+const MAX_ZOOM = 4.2;
+const MIN_ZOOM = 0.25;
 
 let root;
 let sky;
@@ -12,11 +16,13 @@ let dossier;
 let legend;
 let zoomLabel;
 let active = false;
-/** @type {null | { type: 'theme', name: string } | { type: 'entry', id: string }} */
+/** @type {null | { type: 'core' } | { type: 'theme', name: string } | { type: 'entry', id: string }} */
 let selected = null;
+let sheet = false;
 let lastSize = "";
 let drag = null;
 let pan = null;
+let pinchCtl = null;
 let spaceDown = false;
 let composeRaf = 0;
 let composeFrom = null;
@@ -43,10 +49,10 @@ function loadCamera() {
     cam = {
       x: saved.x,
       y: saved.y,
-      z: Math.min(2.6, Math.max(0.3, saved.z)),
+      z: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, saved.z)),
     };
   } else {
-    cam = { x: 0, y: 0, z: 1 };
+    cam = { x: 0, y: 0, z: isMobileApp() ? 1.35 : 1 };
   }
 }
 
@@ -308,11 +314,13 @@ function fitCamera(geo, width, height, animate = false) {
     maxX = Math.max(maxX, entry.x + entry.radius + 20);
     maxY = Math.max(maxY, entry.y + entry.radius + 28);
   }
-  const pad = 48;
+  const mobile = isMobileApp();
+  const pad = mobile ? 18 : 48;
   const boxW = Math.max(120, maxX - minX);
   const boxH = Math.max(120, maxY - minY);
-  const nextZ = Math.min((width - pad * 2) / boxW, (height - pad * 2) / boxH, 1.6);
-  const z = Math.max(0.3, nextZ);
+  const cap = mobile ? 2.8 : 1.6;
+  const nextZ = Math.min((width - pad * 2) / boxW, (height - pad * 2) / boxH, cap);
+  const z = Math.max(MIN_ZOOM, nextZ);
   const next = {
     z,
     x: minX - (width / z - boxW) / 2,
@@ -347,7 +355,7 @@ function zoomAt(clientX, clientY, factor) {
   const sy = ((clientY - rect.top) / Math.max(rect.height, 1)) * viewH;
   const wx = cam.x + sx / cam.z;
   const wy = cam.y + sy / cam.z;
-  cam.z = Math.min(2.6, Math.max(0.3, cam.z * factor));
+  cam.z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.z * factor));
   cam.x = wx - sx / cam.z;
   cam.y = wy - sy / cam.z;
   applyCamera();
@@ -449,6 +457,7 @@ function drawSky(options = {}) {
       || (highlightTags && !highlightTags.has(theme.name))
       ? "is-dim"
       : "";
+    const picked = selectedTheme === theme.name ? "is-picked" : "";
     const dragging = options.overrides?.kind === "theme" && options.overrides.id === theme.name ? "is-dragging" : "";
     const delay = `${(index % 8) * 0.12}s`;
     const progress = aggregateChecklistProgress(theme.entries);
@@ -463,7 +472,7 @@ function drawSky(options = {}) {
       ? `${theme.name} · ${theme.count} · чеклист ${progress.percent}%`
       : `${theme.name} · ${theme.count}`;
     return `
-      <g class="theme ${dim} ${dragging} ${progress ? "has-progress" : ""}" data-theme="${esc(theme.name)}" style="color:${color}; --drift-delay:${delay}">
+      <g class="theme ${dim} ${picked} ${dragging} ${progress ? "has-progress" : ""}" data-theme="${esc(theme.name)}" style="color:${color}; --drift-delay:${delay}">
         ${progressRing}
         <circle class="theme-dot" cx="${theme.x}" cy="${theme.y}" r="${theme.radius}" />
         ${progressLabel}
@@ -478,6 +487,7 @@ function drawSky(options = {}) {
     const related = selectedTheme
       && (entry.homeTag === selectedTheme || (entry.tags || []).includes(selectedTheme));
     const dim = (selectedTheme && !related) || (selectedEntry && entry.id !== selectedEntry) ? "is-dim" : "";
+    const picked = selectedEntry === entry.id ? "is-picked" : "";
     const dragging = options.overrides?.kind === "entry" && options.overrides.id === entry.id ? "is-dragging" : "";
     const progress = checklistProgress(entry.body);
     const moonRing = progress
@@ -488,7 +498,7 @@ function drawSky(options = {}) {
       : `${entry.title} · ${entry.kind === "task" ? "задача" : "заметка"}`;
     const delay = `${(index % 10) * 0.08}s`;
     return `
-      <g class="star ${dim} ${dragging} ${progress ? "has-progress" : ""}" data-entry="${esc(entry.id)}" style="color:${color}; --drift-delay:${delay}">
+      <g class="star ${dim} ${picked} ${dragging} ${progress ? "has-progress" : ""}" data-entry="${esc(entry.id)}" style="color:${color}; --drift-delay:${delay}">
         ${moonRing}
         <circle class="star-dot" cx="${entry.x}" cy="${entry.y}" r="${entry.radius}" />
         ${progress ? `<text class="moon-progress-label" x="${entry.x}" y="${entry.y + 4}" text-anchor="middle" font-size="9">${progress.percent}</text>` : ""}
@@ -522,10 +532,42 @@ function drawSky(options = {}) {
   applyCamera();
 
   legend.textContent = entries.length
-    ? "Орбиты — метки, звёзды — заметки и задачи. Всё можно двигать. Пробел — панорама."
+    ? (isMobileApp()
+      ? "Двумя пальцами — масштаб, одним — сдвиг. Орбиты и звёзды можно двигать."
+      : "Орбиты — метки, звёзды — заметки и задачи. Всё можно двигать. Пробел — панорама.")
     : "Добавьте заметку или задачу — она появится на созвездии.";
 
   return { width, height, geo, shown, entries: placedEntries };
+}
+
+function syncSheet() {
+  root?.classList.toggle("is-sheet", sheet && Boolean(selected));
+}
+
+function identityMarkup(state, themes, entries, hidden) {
+  const openTasks = state.entries.filter((entry) => entry.kind === "task" && entry.status !== "done").length;
+  const openWishes = state.entries.filter((entry) => entry.kind === "wish" && entry.status !== "done").length;
+  return `
+    <p class="eyebrow">Карта личности</p>
+    <h2>${esc(state.profile.name || "Я")}</h2>
+    <label>Имя в центре</label>
+    <input class="text-input identity-name" maxlength="32" value="${esc(state.profile.name)}" />
+    <label>Короткая подпись</label>
+    <input class="text-input identity-epithet" maxlength="80" value="${esc(state.profile.epithet)}" />
+    <div class="stats stats-four">
+      <div class="stat"><b>${entries.length}</b><span>на карте</span></div>
+      <div class="stat"><b>${themes.filter((theme) => theme.name !== "без темы").length}</b><span>орбит</span></div>
+      <div class="stat"><b>${openTasks}</b><span>задач</span></div>
+      <div class="stat"><b>${openWishes}</b><span>желаний</span></div>
+    </div>
+    <p class="lede">Каждая заметка и задача — звезда. Орбиты-метки и звёзды можно расставить руками.</p>
+    <div class="orbit-list">
+      ${themes.map((theme) => {
+        const progress = aggregateChecklistProgress(theme.entries);
+        return `<button type="button" data-pick="${esc(theme.name)}"><b>${esc(theme.name)}</b> <small>${theme.count}${progress ? ` · ${progress.percent}%` : ""}</small></button>`;
+      }).join("") || "<p>Пока нет ни одной орбиты.</p>"}
+    </div>
+    ${hidden ? `<p class="hint">На небе видны ${MAX_THEMES} самых частых меток. Остальные ${hidden} — в этом списке.</p>` : ""}`;
 }
 
 function drawDossier() {
@@ -535,52 +577,54 @@ function drawDossier() {
   const { themes, pairs } = themesOf(state.entries);
   const entries = visibleEntries();
   const hidden = Math.max(0, themes.length - MAX_THEMES);
+  // На сайте досье — постоянная боковая панель: без выбора в ней «Карта личности».
+  // В приложении это шторка, которая открывается только по явному выбору.
+  const docked = !isMobileApp();
+  const reset = () => {
+    selected = null;
+    sheet = false;
+    dossier.innerHTML = docked ? identityMarkup(state, themes, entries, hidden) : "";
+    syncSheet();
+  };
 
-  if (selected?.type === "entry") {
+  if (!docked && (!sheet || !selected)) {
+    // Выбор сохраняем: первый тап подсвечивает, второй открывает шторку.
+    dossier.innerHTML = "";
+    syncSheet();
+    return;
+  }
+
+  if (!selected || selected.type === "core") {
+    dossier.innerHTML = identityMarkup(state, themes, entries, hidden);
+    syncSheet();
+    return;
+  }
+
+  if (selected.type === "entry") {
     const entry = entries.find((item) => item.id === selected.id) || state.entries.find((item) => item.id === selected.id);
     if (!entry) {
-      selected = null;
+      reset();
+      return;
     } else {
       const progress = checklistProgress(entry.body);
       dossier.innerHTML = `
-        <button type="button" class="back" data-back>Космос</button>
+        ${docked ? `<button type="button" class="back" data-back>Космос</button>` : ""}
         <p class="eyebrow">${entry.kind === "task" ? "Задача" : "Заметка"}</p>
         <h2>${esc(entry.title)}</h2>
         <p class="hint">${esc(formatDate(entry.updatedAt))}${entry.tags?.length ? ` · ${entry.tags.map((tag) => `#${tag}`).join(" ")}` : ""}</p>
         ${progress ? progressBadgeHtml(progress) : ""}
-        <p class="lede">${esc(short(entry.body.replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>
+        <p class="lede">${esc(short(plainBody(entry.body).replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>
         <div class="dossier-actions">
           <button type="button" class="btn slim" data-open="${esc(entry.id)}">Открыть</button>
           ${entry.tags?.[0] ? `<button type="button" class="btn ghost slim" data-pick="${esc(entry.tags[0])}">К орбите</button>` : ""}
         </div>`;
+      syncSheet();
       return;
     }
   }
 
-  if (!selected || selected.type !== "theme" || !themes.some((theme) => theme.name === selected.name)) {
-    const openTasks = state.entries.filter((entry) => entry.kind === "task" && entry.status !== "done").length;
-    const openWishes = state.entries.filter((entry) => entry.kind === "wish" && entry.status !== "done").length;
-    dossier.innerHTML = `
-      <p class="eyebrow">Карта личности</p>
-      <h2>${esc(state.profile.name || "Я")}</h2>
-      <label>Имя в центре</label>
-      <input class="text-input identity-name" maxlength="32" value="${esc(state.profile.name)}" />
-      <label>Короткая подпись</label>
-      <input class="text-input identity-epithet" maxlength="80" value="${esc(state.profile.epithet)}" />
-      <div class="stats stats-four">
-        <div class="stat"><b>${entries.length}</b><span>на карте</span></div>
-        <div class="stat"><b>${themes.filter((theme) => theme.name !== "без темы").length}</b><span>орбит</span></div>
-        <div class="stat"><b>${openTasks}</b><span>задач</span></div>
-        <div class="stat"><b>${openWishes}</b><span>желаний</span></div>
-      </div>
-      <p class="lede">Каждая заметка и задача — звезда. Орбиты-метки и звёзды можно расставить руками.</p>
-      <div class="orbit-list">
-        ${themes.map((theme) => {
-          const progress = aggregateChecklistProgress(theme.entries);
-          return `<button type="button" data-pick="${esc(theme.name)}"><b>${esc(theme.name)}</b> <small>${theme.count}${progress ? ` · ${progress.percent}%` : ""}</small></button>`;
-        }).join("") || "<p>Пока нет ни одной орбиты.</p>"}
-      </div>
-      ${hidden ? `<p class="hint">На небе видны ${MAX_THEMES} самых частых меток. Остальные ${hidden} — в этом списке.</p>` : ""}`;
+  if (selected.type !== "theme" || !themes.some((theme) => theme.name === selected.name)) {
+    reset();
     return;
   }
 
@@ -589,7 +633,7 @@ function drawDossier() {
   const themeProgress = aggregateChecklistProgress(theme.entries);
   const themeEntries = theme.entries.filter((entry) => entry.kind === "note" || entry.kind === "task");
   dossier.innerHTML = `
-    <button type="button" class="back" data-back>Все орбиты</button>
+    ${docked ? `<button type="button" class="back" data-back>Все орбиты</button>` : ""}
     <p class="eyebrow">Орбита</p>
     <h2>${esc(theme.name)}</h2>
     <p class="lede">${themeEntries.length} ${themeEntries.length === 1 ? "запись на этой орбите" : "записей на этой орбите"}.</p>
@@ -610,6 +654,7 @@ function drawDossier() {
       <button type="button" class="btn slim" data-new>Запись на эту орбиту</button>
       <button type="button" class="btn ghost slim" data-filter>Показать в архиве</button>
     </div>`;
+  syncSheet();
 }
 
 function bindIdentity() {
@@ -701,7 +746,7 @@ function fitView() {
 }
 
 export function render() {
-  if (!active || drag || pan) return;
+  if (!active || drag || pan || pinchCtl?.isPinching()) return;
   const rect = sky.getBoundingClientRect();
   if (rect.width < 40 || rect.height < 40) {
     requestAnimationFrame(() => {
@@ -795,7 +840,24 @@ export function mount(parent) {
     event.preventDefault();
   };
 
+  pinchCtl = attachPinch(svg, {
+    onPinchStart: () => {
+      pan = null;
+      drag = null;
+      sky.classList.remove("is-panning", "is-dragging");
+      svg.classList.remove("is-live");
+    },
+    onZoom: (x, y, factor) => {
+      zoomAt(x, y, factor);
+    },
+    onPinchEnd: () => {
+      persistCamera();
+      drawSky();
+    },
+  });
+
   svg.addEventListener("pointerdown", (event) => {
+    if (pinchCtl?.pointerCount() >= 2 || pinchCtl?.isPinching()) return;
     const onTheme = event.target.closest("[data-theme]");
     const onStar = event.target.closest("[data-entry]");
     const onCore = event.target.closest(".core");
@@ -822,6 +884,7 @@ export function mount(parent) {
   });
 
   svg.addEventListener("pointermove", (event) => {
+    if (pinchCtl?.isPinching()) return;
     if (pan && event.pointerId === pan.pointerId) {
       const dist = Math.hypot(event.clientX - pan.x, event.clientY - pan.y);
       if (!pan.armed && dist < 4) return;
@@ -850,6 +913,7 @@ export function mount(parent) {
   });
 
   const endPointer = (event) => {
+    if (pinchCtl?.isPinching()) return;
     if (pan && (!event || event.pointerId === pan.pointerId)) {
       const finished = pan;
       pan = null;
@@ -859,6 +923,7 @@ export function mount(parent) {
         drawSky();
       } else if (!spaceDown) {
         selected = null;
+        sheet = false;
         render();
       } else {
         drawSky();
@@ -872,6 +937,7 @@ export function mount(parent) {
     const rect = sky.getBoundingClientRect();
     if (finished.moved) {
       const pos = clampPos(finished.x, finished.y, rect.width, rect.height);
+      sheet = false;
       if (finished.kind === "theme") {
         saveThemePosition(finished.id, pos.x, pos.y, rect.width, rect.height);
         selected = { type: "theme", name: finished.id };
@@ -883,10 +949,14 @@ export function mount(parent) {
       drawDossier();
       bindIdentity();
     } else if (finished.kind === "theme") {
+      const same = selected?.type === "theme" && selected.name === finished.id;
       selected = { type: "theme", name: finished.id };
+      sheet = same;
       render();
     } else {
+      const same = selected?.type === "entry" && selected.id === finished.id;
       selected = { type: "entry", id: finished.id };
+      sheet = same;
       render();
     }
   };
@@ -911,9 +981,10 @@ export function mount(parent) {
     if (spaceDown) return;
     if (event.target.closest("[data-theme]") || event.target.closest("[data-entry]")) return;
     if (event.target.closest("[data-action='core']")) {
-      selected = null;
+      selected = { type: "core" };
+      sheet = true;
       render();
-      dossier.querySelector(".identity-name")?.focus();
+      if (!isMobileApp()) dossier.querySelector(".identity-name")?.focus();
     }
   });
 
@@ -926,12 +997,14 @@ export function mount(parent) {
     const pick = event.target.closest("[data-pick]")?.dataset.pick;
     if (pick) {
       selected = { type: "theme", name: pick };
+      sheet = true;
       render();
       return;
     }
     const selectEntry = event.target.closest("[data-select-entry]")?.dataset.selectEntry;
     if (selectEntry) {
       selected = { type: "entry", id: selectEntry };
+      sheet = true;
       render();
       return;
     }
@@ -972,8 +1045,15 @@ export function setActive(on) {
   }
 }
 
+export function closeSheet() {
+  selected = null;
+  sheet = false;
+  if (active) render();
+}
+
 export function focusTheme(name) {
   selected = name ? { type: "theme", name } : null;
+  sheet = Boolean(name);
   if (active) render();
 }
 
