@@ -368,6 +368,7 @@ function handleBack() {
     popover.hidden = true;
     return true;
   }
+  if (current === "calendar" && calendar.handleBack()) return true;
   if (current === "constellation" && constellation.isSheetOpen()) {
     constellation.closeSheet();
     return true;

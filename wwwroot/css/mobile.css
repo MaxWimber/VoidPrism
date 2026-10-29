@@ -205,8 +205,7 @@ h1 {
   flex: 1;
 }
 
-.view-head .btn,
-.cal-head-tools .btn {
+.view-head .btn {
   width: auto !important;
   flex: none;
   align-self: flex-start;
@@ -217,63 +216,31 @@ h1 {
   white-space: nowrap;
 }
 
-.cal-head-tools {
-  width: auto;
-  flex: none;
-  align-items: flex-end !important;
-  gap: 6px !important;
+/* Календарь на телефоне: вид во всю ширину, под ним фильтры, ниже период. */
+.cal-controls {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
 
-.cal-head-tools .segmented {
+.cal-views {
   width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
-.cal-toolbar {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 10px !important;
-  margin: 0 !important;
-}
-
-.cal-toolbar .filters {
-  margin: 0;
-}
-
-.cal-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px !important;
-  min-width: 0 !important;
-  width: 100%;
+.cal-period {
+  margin-left: 0;
+  justify-content: space-between;
+  min-height: 32px;
 }
 
 .cal-title {
-  width: 100%;
-  margin: 2px 0 0 !important;
-  font-size: 16px !important;
-}
-
-.calendar-view.is-day .cal-layout {
-  grid-template-rows: minmax(0, 1fr) !important;
-}
-
-.calendar-view.is-day .cal-board {
-  display: none !important;
-}
-
-.calendar-view.is-day .cal-panel {
-  border-top: 0 !important;
+  font-size: 17px !important;
 }
 
 .cal-layout {
   display: grid !important;
   grid-template-columns: 1fr !important;
-  grid-template-rows: minmax(0, 1fr) minmax(108px, 32%) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
   gap: 0 !important;
   flex: 1;
   min-height: 0;
@@ -286,8 +253,6 @@ h1 {
 }
 
 .cal-panel {
-  border-left: 0 !important;
-  border-top: 1px solid var(--line);
   max-height: none;
   min-height: 0;
   overflow: auto;
@@ -657,4 +622,68 @@ h1 {
 .fab {
   right: 16px;
   bottom: 16px;
+}
+
+/* Неделя на телефоне: все 7 дней в ширину экрана — вбок теперь листаются недели. */
+.cal-week {
+  min-width: 0 !important;
+  gap: 4px !important;
+}
+
+.cal-week-head,
+.cal-week-allday {
+  grid-template-columns: 34px repeat(7, minmax(0, 1fr)) !important;
+  gap: 2px !important;
+}
+
+.cal-week-body {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 2px !important;
+}
+
+.cal-week-cols {
+  gap: 2px !important;
+}
+
+.cal-week-day {
+  padding: 4px 0 !important;
+  font-size: 10px;
+  border-radius: 8px !important;
+}
+
+.cal-week-day strong {
+  font-size: 15px !important;
+}
+
+.cal-allday-col {
+  min-height: 36px !important;
+  padding: 2px !important;
+  border-radius: 8px !important;
+}
+
+.cal-allday-empty {
+  padding: 4px 0 !important;
+  font-size: 10px !important;
+}
+
+.cal-corner-label,
+.cal-hour {
+  font-size: 9px !important;
+}
+
+.cal-day-col {
+  border-radius: 8px !important;
+}
+
+.cal-block {
+  left: 1px !important;
+  right: 1px !important;
+  padding: 2px 3px !important;
+  min-height: 30px !important;
+  font-size: 9px;
+  overflow: hidden;
+}
+
+.cal-block strong {
+  font-size: 8px !important;
 }

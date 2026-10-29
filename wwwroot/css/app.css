@@ -1280,44 +1280,111 @@ svg.is-live .guide {
 }
 
 .calendar-view {
+  position: relative;
   min-height: 0;
 }
 
-.cal-head-tools {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.cal-toolbar {
+/* Управление календарём: вид · что показывать · период. На широком экране — в строку. */
+.cal-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 18px;
+  gap: 10px 16px;
 }
 
-.cal-nav {
+.cal-views {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 300px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.cal-views button {
+  min-height: 32px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cal-views button.is-on {
+  color: var(--ink);
+  background: rgba(126, 231, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.35);
+}
+
+.cal-modes {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
-  min-width: 220px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
+.cal-modes::-webkit-scrollbar { display: none; }
+
+.cal-modes .filters {
+  flex-wrap: nowrap;
+}
+
+.cal-modes .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cal-sort {
+  color: var(--cyan);
+}
+
+.cal-sort[hidden] { display: none; }
+
+.cal-period {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.cal-period [hidden] { display: none; }
+
 .cal-title {
-  margin-left: 8px;
   font-family: var(--display);
   font-size: 18px;
   letter-spacing: -0.03em;
   text-transform: capitalize;
 }
 
+.cal-board[hidden],
+.cal-panel[hidden] {
+  display: none !important;
+}
+
+.calendar-view.is-month .cal-layout { touch-action: pan-x; }
+.calendar-view.is-week .cal-layout,
+.calendar-view.is-day .cal-layout { touch-action: pan-y; }
+
+.calendar-view .cal-panel { padding-bottom: 88px; }
+
+/* «Плюсик» только в «Дне»: в месяце и неделе тап по дню открывает день. */
+.calendar-view:not(.is-day) .fab { display: none; }
+
 .cal-layout {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -1333,7 +1400,6 @@ svg.is-live .guide {
 }
 
 .cal-panel {
-  border-left: 1px solid var(--line);
   background: rgba(10, 12, 28, 0.72);
   padding: 16px;
   display: flex;
@@ -1341,18 +1407,6 @@ svg.is-live .guide {
   gap: 12px;
   min-height: 0;
   overflow: auto;
-}
-
-.calendar-view.is-day .cal-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.calendar-view.is-day .cal-board {
-  display: none;
-}
-
-.calendar-view.is-day .cal-panel {
-  border-left: 0;
 }
 
 .cal-panel h2 {
@@ -1407,10 +1461,24 @@ svg.is-live .guide {
   opacity: 0.85;
 }
 
+/* Месяц занимает ровно высоту окна, без прокрутки: колесо и свайп листают месяцы. */
 .cal-month {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-  min-height: 100%;
+  height: 100%;
+}
+
+.cal-month .cal-grid {
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.calendar-view.is-month .cal-board {
+  overflow: hidden;
+}
+
+.cal-month .cal-cell {
+  min-height: 0;
 }
 
 .cal-weekdays,
