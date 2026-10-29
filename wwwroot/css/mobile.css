@@ -653,3 +653,8 @@ h1 {
   min-height: 34px;
   min-width: 34px;
 }
+
+.fab {
+  right: 16px;
+  bottom: 16px;
+}
