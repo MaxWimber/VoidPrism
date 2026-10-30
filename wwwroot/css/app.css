@@ -162,73 +162,6 @@ button { cursor: pointer; }
 
 .nav-spacer { flex: 1; }
 
-.me {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  border-radius: 16px;
-  padding: 8px 4px;
-  background: transparent;
-  color: var(--muted);
-}
-
-.me-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: var(--display);
-  font-weight: 700;
-  color: #081018;
-  background: linear-gradient(160deg, var(--cyan), var(--violet) 55%, var(--rose));
-}
-
-.me-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-}
-
-.popover {
-  position: absolute;
-  left: 142px;
-  bottom: 16px;
-  width: 300px;
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(14, 18, 40, 0.94);
-  box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
-  backdrop-filter: blur(18px);
-  z-index: 6;
-}
-
-.popover[hidden] { display: none !important; }
-
-.popover h2 {
-  margin: 0 0 4px;
-  font-family: var(--display);
-  font-size: 18px;
-  letter-spacing: -0.03em;
-}
-
-.popover .hint {
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.popover label {
-  display: block;
-  margin: 10px 0 6px;
-  color: var(--faint);
-  font-size: 12px;
-}
-
 .stage {
   min-width: 0;
   min-height: 0;
@@ -257,7 +190,8 @@ button { cursor: pointer; }
 
 .archive-view.is-on,
 .calendar-view.is-on,
-.wishlist-view.is-on { padding: 26px 32px 16px; gap: 16px; }
+.wishlist-view.is-on,
+.settings-view.is-on { padding: 26px 32px 16px; gap: 16px; }
 
 .view-head {
   display: flex;
@@ -2476,7 +2410,6 @@ kbd {
 
   .brand { margin: 0 6px 0 0; }
 
-  .popover { left: 12px; bottom: 78px; }
 
   h1 { font-size: 32px; }
 
@@ -2694,4 +2627,100 @@ body.is-selecting .fab { display: none; }
   align-items: center;
   gap: 6px;
   margin-bottom: 2px;
+}
+
+/* Настройки: вкладки «Настройки · Профиль», профиль — обычный раздел по концепту. */
+.settings-view.is-on {
+  overflow: auto;
+}
+
+.settings-tabs,
+.studio-tabs {
+  max-width: 360px;
+  flex: none;
+}
+
+.settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.settings-pane[hidden] {
+  display: none;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 6px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #081018;
+  background: linear-gradient(160deg, var(--cyan), var(--violet) 55%, var(--rose));
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.profile-names {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-title {
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-subtitle {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.profile-chips {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.profile-clear {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+/* Студия: вкладки «Схемы · Таблицы», под ними полотно или таблицы. */
+.studio-view.is-on {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 0;
+  min-height: 0;
+}
+
+.studio-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tables-view.is-on {
+  justify-content: center;
 }

@@ -3,12 +3,13 @@ import * as archive from "./archive.js";
 import * as calendar from "./calendar.js";
 import * as canvas from "./canvas.js";
 import * as constellation from "./constellation.js";
+import * as settings from "./settings.js";
+import * as studio from "./studio.js";
 import * as wishlist from "./wishlist.js";
 import { isMobileApp } from "./platform.js";
 import { clearSelection, isSelecting } from "./select.js";
-import { bootstrap, clearCosmos, getState, subscribe, update } from "./store.js";
-import { syncStatus } from "./sync.js";
-import { confirmDialog, dismissModal, icons, initial, isModalOpen, isTyping, startOfDay, toast } from "./ui.js";
+import { bootstrap, getState, subscribe } from "./store.js";
+import { dismissModal, icons, isModalOpen, isTyping, startOfDay, toast } from "./ui.js";
 
 const app = document.querySelector("#app");
 const mobile = isMobileApp();
@@ -49,16 +50,6 @@ function bootStars() {
   requestAnimationFrame(frame);
 }
 
-const profileFields = `
-      <label for="profile-name">Имя в центре созвездия</label>
-      <input id="profile-name" class="text-input" maxlength="32" />
-      <label for="profile-epithet">Подпись</label>
-      <input id="profile-epithet" class="text-input" maxlength="80" />
-      <div class="drawer-actions" style="margin-top:14px">
-        <button type="button" class="btn danger slim" data-clear>Очистить</button>
-        <button type="button" class="btn slim" data-save-profile>Сохранить</button>
-      </div>`;
-
 function desktopShell() {
   app.innerHTML = `
     <nav class="nav">
@@ -70,46 +61,23 @@ function desktopShell() {
       <button type="button" class="nav-btn" data-view="archive">${icons.archive}<span>Архив</span></button>
       <button type="button" class="nav-btn" data-view="calendar">${icons.calendar}<span>Календарь</span></button>
       <button type="button" class="nav-btn" data-view="wishlist">${icons.wish}<span>Желания</span></button>
-      <button type="button" class="nav-btn" data-view="canvas">${icons.board}<span>Полотно</span></button>
+      <button type="button" class="nav-btn" data-view="studio">${icons.studio}<span>Студия</span></button>
       <div class="nav-spacer"></div>
-      <button type="button" class="me" data-me>
-        <span class="me-avatar"></span>
-        <span class="me-label"></span>
-      </button>
+      <button type="button" class="nav-btn" data-view="settings">${icons.gear}<span>Настройки</span></button>
     </nav>
-    <div class="popover" hidden>
-      <h2>Профиль</h2>
-      <p class="hint">Записи, задачи, желания и схемы хранятся в базе Django на этом компьютере.</p>
-      ${profileFields}
-    </div>
     <main class="stage"></main>`;
 }
 
 function mobileShell() {
   app.innerHTML = `
-    <div class="popover" hidden>
-      <h2>Профиль</h2>
-      <p class="hint">Данные хранятся на этом телефоне. Сайт и приложение пока не связаны.</p>
-      <div class="sync-card" data-sync-card>
-        <strong>Синхронизация с сайтом</strong>
-        <span class="hint" data-sync-message></span>
-        <label class="check is-disabled">
-          <input type="checkbox" disabled /> Скоро
-        </label>
-      </div>
-      ${profileFields}
-    </div>
     <main class="stage"></main>
     <nav class="nav nav-bottom" aria-label="Разделы">
       <button type="button" class="nav-btn" data-view="constellation">${icons.star}<span>Звёзды</span></button>
       <button type="button" class="nav-btn" data-view="archive">${icons.archive}<span>Архив</span></button>
       <button type="button" class="nav-btn" data-view="calendar">${icons.calendar}<span>Дни</span></button>
       <button type="button" class="nav-btn" data-view="wishlist">${icons.wish}<span>Желания</span></button>
-      <button type="button" class="nav-btn" data-view="canvas">${icons.board}<span>Схемы</span></button>
-      <button type="button" class="nav-btn nav-me" data-me>
-        <span class="me-avatar nav-avatar"></span>
-        <span class="me-label">Я</span>
-      </button>
+      <button type="button" class="nav-btn" data-view="studio">${icons.studio}<span>Студия</span></button>
+      <button type="button" class="nav-btn" data-view="settings">${icons.gear}<span>Настройки</span></button>
     </nav>`;
 }
 
@@ -134,36 +102,8 @@ function show(view, { fromBack = false } = {}) {
   constellation.setActive(view === "constellation");
   calendar.setActive(view === "calendar");
   wishlist.setActive(view === "wishlist");
-  canvas.setActive(view === "canvas");
-}
-
-function paintChrome() {
-  const profile = getState().profile;
-  const avatar = app.querySelector(".me-avatar");
-  const label = app.querySelector("[data-me] .me-label");
-  if (avatar) avatar.textContent = initial(profile.name);
-  if (label) label.textContent = profile.name || "Я";
-  const name = app.querySelector("#profile-name");
-  const epithet = app.querySelector("#profile-epithet");
-  if (name && document.activeElement !== name) name.value = profile.name || "";
-  if (epithet && document.activeElement !== epithet) epithet.value = profile.epithet || "";
-  const syncMsg = app.querySelector("[data-sync-message]");
-  if (syncMsg) syncMsg.textContent = syncStatus().message;
-}
-
-async function clearAll() {
-  const ok = await confirmDialog({
-    title: "Очистить космос?",
-    text: mobile
-      ? "Заметки, задачи, события, желания и схемы будут стёрты с этого телефона. Имя в центре останется."
-      : "Заметки, задачи, события, желания и схемы будут стёрты из базы. Имя в центре останется.",
-    confirmLabel: "Очистить",
-    danger: true,
-  });
-  if (!ok) return;
-  clearCosmos();
-  app.querySelector(".popover").hidden = true;
-  toast("Космос очищен");
+  studio.setActive(view === "studio");
+  settings.setActive(view === "settings");
 }
 
 function wire() {
@@ -172,34 +112,20 @@ function wire() {
   archive.mount(stage);
   calendar.mount(stage);
   wishlist.mount(stage);
-  canvas.mount(stage);
+  studio.mount(stage);
+  settings.mount(stage);
   app.querySelector(".nav").addEventListener("click", (event) => {
     const view = event.target.closest("[data-view]")?.dataset.view;
     if (!view) return;
     if (view === "constellation") constellation.closeSheet();
     show(view);
   });
-  const popover = app.querySelector(".popover");
-  app.querySelector("[data-me]").addEventListener("click", () => {
-    popover.hidden = !popover.hidden;
-    if (!popover.hidden) paintChrome();
-  });
-  app.querySelector("[data-save-profile]").addEventListener("click", () => {
-    saveProfileFromForm();
-    popover.hidden = true;
-  });
-  app.querySelector("[data-clear]").addEventListener("click", clearAll);
-  document.addEventListener("click", (event) => {
-    if (popover.hidden) return;
-    if (event.target.closest(".popover") || event.target.closest("[data-me]")) return;
-    popover.hidden = true;
-  });
   subscribe(() => {
-    paintChrome();
     if (current === "archive") archive.render();
     if (current === "constellation") constellation.render();
     if (current === "calendar") calendar.render();
     if (current === "wishlist") wishlist.render();
+    if (current === "settings") settings.render();
     canvas.refreshFromOutside();
   });
   window.addEventListener("keydown", (event) => {
@@ -213,7 +139,7 @@ function wire() {
       return;
     }
     if (isTyping(event.target) && event.key !== "Escape") return;
-    if (current === "canvas") canvas.keydown(event);
+    if (current === "studio") studio.keydown(event);
     else if (current === "constellation") constellation.keydown(event);
     else if (current === "archive") archive.keydown(event);
     else if (current === "calendar") calendar.keydown(event);
@@ -222,18 +148,6 @@ function wire() {
   window.addEventListener("keyup", (event) => {
     canvas.keyup(event);
     constellation.keyup(event);
-  });
-}
-
-function saveProfileFromForm() {
-  const name = app.querySelector("#profile-name").value.trim() || "Я";
-  const epithet = app.querySelector("#profile-epithet").value.trim();
-  const profile = getState().profile;
-  if (name === profile.name && epithet === profile.epithet) return;
-  update((state) => {
-    state.profile.name = name;
-    state.profile.epithet = epithet;
-    return state;
   });
 }
 
@@ -345,11 +259,6 @@ function handleBack() {
     return true;
   }
   if (archive.handleBack()) return true;
-  const popover = app.querySelector(".popover");
-  if (popover && !popover.hidden) {
-    popover.hidden = true;
-    return true;
-  }
   if (current === "calendar" && calendar.handleBack()) return true;
   if (current === "constellation" && constellation.handleBack()) return true;
   const previous = visited.pop();
@@ -401,7 +310,6 @@ try {
   throw new Error("bootstrap");
 }
 
-paintChrome();
 show("constellation");
 shellReady = true;
 if (window.__voidprismPending) {

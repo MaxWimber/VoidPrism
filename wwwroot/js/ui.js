@@ -180,6 +180,8 @@ export function toast(message) {
 }
 
 export const icons = {
+  gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M10.3 3.5h3.4l.5 2.4a6.5 6.5 0 0 1 1.7 1l2.3-.8 1.7 2.9-1.8 1.6a6.6 6.6 0 0 1 0 2l1.8 1.6-1.7 2.9-2.3-.8a6.5 6.5 0 0 1-1.7 1l-.5 2.4h-3.4l-.5-2.4a6.5 6.5 0 0 1-1.7-1l-2.3.8-1.7-2.9 1.8-1.6a6.6 6.6 0 0 1 0-2L3.8 9l1.7-2.9 2.3.8a6.5 6.5 0 0 1 1.7-1z"/><circle cx="12" cy="12" r="2.6"/></svg>`,
+  studio: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke-linecap="round"/></svg>`,
   back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5 8 12l7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" stroke-linecap="round" stroke-linejoin="round"/></svg>`,

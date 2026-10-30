@@ -90,20 +90,6 @@ body.is-mobile-app {
   white-space: nowrap;
 }
 
-.nav-bottom .nav-me .nav-avatar,
-.nav-bottom .me-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: linear-gradient(135deg, rgba(126, 231, 255, 0.35), rgba(196, 181, 253, 0.45));
-  box-shadow: inset 0 0 0 1px rgba(186, 204, 255, 0.25);
-  flex: 0 0 auto;
-}
-
 .stage {
   position: absolute !important;
   top: var(--safe-top, 36px);
@@ -117,33 +103,6 @@ body.is-mobile-app {
   flex-direction: column;
 }
 
-.popover {
-  position: fixed !important;
-  left: 12px !important;
-  right: 12px !important;
-  top: calc(12px + var(--safe-top, 36px)) !important;
-  bottom: auto !important;
-  width: auto !important;
-  z-index: 60 !important;
-  max-height: calc(100dvh - var(--safe-top, 36px) - var(--nav-block) - 24px);
-  overflow: auto;
-}
-
-.sync-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin: 0 0 12px;
-  display: grid;
-  gap: 6px;
-  background: rgba(126, 231, 255, 0.05);
-}
-
-.check.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
-}
-
 .view {
   min-height: 0;
 }
@@ -151,6 +110,7 @@ body.is-mobile-app {
 .archive-view.is-on,
 .calendar-view.is-on,
 .wishlist-view.is-on,
+.settings-view.is-on,
 .constellation-view.is-on,
 .canvas-view.is-on {
   padding: 12px 12px 10px !important;
@@ -702,4 +662,20 @@ h1 {
 
 .select-bar {
   bottom: calc(12px + var(--nav-block));
+}
+
+/* Студия на телефоне: вкладки сверху, полотно — до нижней навигации. */
+.studio-view.is-on {
+  padding: 12px 12px 0 !important;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.settings-tabs,
+.studio-tabs {
+  max-width: none;
+}
+
+.settings-view.is-on {
+  overflow-y: auto !important;
 }
