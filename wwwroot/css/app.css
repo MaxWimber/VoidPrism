@@ -1529,6 +1529,10 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
 .calendar-view.is-day .cal-layout,
 .calendar-view.is-day .cal-layout * { touch-action: pan-y; }
 
+/* Строку фильтра по часам браузер прокручивает вбок сам. */
+.calendar-view.is-day .cal-layout .chip-row,
+.calendar-view.is-day .cal-layout .chip-row * { touch-action: pan-x; }
+
 .calendar-view .cal-panel { padding-bottom: 88px; }
 
 /* «Плюсик» только в «Дне»: в месяце и неделе тап по дню открывает день. */

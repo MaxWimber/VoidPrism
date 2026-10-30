@@ -513,6 +513,11 @@ function bindSwipes(area) {
   let swallowClick = false;
   area.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse") return;
+    // Строка чипов (фильтр по часам) прокручивается вбок сама — её жест не листает период.
+    if (event.target.closest(".chip-row")) {
+      swipe = null;
+      return;
+    }
     swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null };
   });
   area.addEventListener("pointermove", (event) => {
