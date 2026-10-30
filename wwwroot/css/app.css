@@ -1452,10 +1452,9 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
 
 /* Период: стрелки и заголовок по центру, «Сегодня» справа. */
 .cal-period {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
   flex: 1 1 360px;
   margin-left: auto;
   min-width: 0;
@@ -1465,14 +1464,18 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
 
 .cal-period-nav {
   display: flex;
+  max-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 4px;
 }
 
-.cal-period-end {
-  display: flex;
-  justify-content: flex-end;
+/* «Сегодня» — в конце строки «План · Журнал · События», чтобы не теснить заголовок. */
+.cal-today {
+  margin-left: auto;
 }
+
+.cal-today[hidden] { display: none; }
 
 .cal-arrow {
   width: 34px;
@@ -1498,6 +1501,8 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   text-align: center;
   text-transform: capitalize;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: default;
 }
 
@@ -2678,8 +2683,11 @@ body.is-selecting .fab { display: none; }
 }
 
 /* День: фильтр по часам. */
+/* Строка в колонке списка дня: своей высоты, без растягивания (.chip-row растёт по flex). */
 .cal-hour-chips {
   display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }

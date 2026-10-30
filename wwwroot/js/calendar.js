@@ -47,7 +47,9 @@ let dayFrom = null;
 // «Месяц» по тапу на заголовок показывает сетку дней → месяцев → лет.
 let zoom = "days";
 // «День» можно сузить до одного часа (тап по кубикам часа в «Неделе» или чип часа).
+// null — все записи, ALL_DAY — только без времени, число — час.
 let hourFilter = null;
+const ALL_DAY = "allday";
 let lastView = null;
 
 function kindLabel(kind) {
@@ -353,22 +355,30 @@ function hourLabel(hour) {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+function matchesHour(entry) {
+  if (hourFilter == null) return true;
+  if (hourFilter === ALL_DAY) return !hasClockTime(entry._stamp);
+  return hasClockTime(entry._stamp) && new Date(entry._stamp).getHours() === hourFilter;
+}
+
 function paintPanel(map) {
   const all = map.get(selectedDay) || [];
   const hours = [...new Set(all.filter((entry) => hasClockTime(entry._stamp)).map((entry) => new Date(entry._stamp).getHours()))];
-  if (hourFilter != null && !hours.includes(hourFilter)) hours.push(hourFilter);
+  if (typeof hourFilter === "number" && !hours.includes(hourFilter)) hours.push(hourFilter);
   hours.sort((a, b) => a - b);
-  const items = hourFilter == null
-    ? all
-    : all.filter((entry) => hasClockTime(entry._stamp) && new Date(entry._stamp).getHours() === hourFilter);
-  const chips = hours.length ? `
+  const hasAllDay = all.some((entry) => !hasClockTime(entry._stamp));
+  const items = all.filter(matchesHour);
+  // Фильтр виден всегда, когда в дне есть записи (или выбран час из «Недели»).
+  const chip = (value, label) => `<button type="button" class="chip ${hourFilter === value ? "is-on" : ""}" data-hour-filter="${value ?? ""}">${label}</button>`;
+  const chips = all.length || hourFilter != null ? `
     <div class="chip-row cal-hour-chips">
-      <button type="button" class="chip ${hourFilter == null ? "is-on" : ""}" data-hour-filter="">Все</button>
-      ${hours.map((hour) => `<button type="button" class="chip ${hourFilter === hour ? "is-on" : ""}" data-hour-filter="${hour}">${hourLabel(hour)}</button>`).join("")}
+      ${chip(null, "Все")}
+      ${hasAllDay ? chip(ALL_DAY, "Весь день") : ""}
+      ${hours.map((hour) => chip(hour, hourLabel(hour))).join("")}
     </div>` : "";
-  const empty = hourFilter == null
-    ? "Плюсик внизу добавит запись на этот день."
-    : `В ${hourLabel(hourFilter)} пусто — плюсик добавит запись на этот час.`;
+  const empty = typeof hourFilter === "number"
+    ? `В ${hourLabel(hourFilter)} пусто — плюсик добавит запись на этот час.`
+    : "Плюсик внизу добавит запись на этот день.";
   panelEl.innerHTML = `
     ${chips}
     <div class="cal-panel-list">
@@ -591,16 +601,13 @@ export function mount(parent) {
       <div class="cal-modes">
         <div class="filters" data-modes></div>
         <button type="button" class="chip cal-sort" data-journal-toggle hidden></button>
+        <button type="button" class="chip cal-today" data-today hidden>Сегодня</button>
       </div>
       <div class="cal-period">
-        <span></span>
         <div class="cal-period-nav">
           <button type="button" class="icon-btn cal-arrow" data-step="-1" aria-label="Предыдущий период">${icons.back}</button>
           <button type="button" class="cal-title" data-zoom-title></button>
           <button type="button" class="icon-btn cal-arrow is-next" data-step="1" aria-label="Следующий период">${icons.back}</button>
-        </div>
-        <div class="cal-period-end">
-          <button type="button" class="chip" data-today hidden>Сегодня</button>
         </div>
       </div>
     </div>
@@ -654,7 +661,9 @@ export function mount(parent) {
       render();
     }
   });
-  root.querySelector("[data-new]").addEventListener("click", () => createForDay(selectedDay, view === "day" ? hourFilter : null));
+  root.querySelector("[data-new]").addEventListener("click", () => {
+    createForDay(selectedDay, view === "day" && typeof hourFilter === "number" ? hourFilter : null);
+  });
 
   const layout = root.querySelector(".cal-layout");
   bindSwipes(layout);
@@ -699,7 +708,8 @@ export function mount(parent) {
   panelEl.addEventListener("click", (event) => {
     const filter = event.target.closest("[data-hour-filter]");
     if (filter) {
-      hourFilter = filter.dataset.hourFilter === "" ? null : Number(filter.dataset.hourFilter);
+      const value = filter.dataset.hourFilter;
+      hourFilter = value === "" ? null : value === ALL_DAY ? ALL_DAY : Number(value);
       render();
       return;
     }
