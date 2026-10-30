@@ -1,4 +1,5 @@
 import { bridge } from "./bridge.js";
+import { feedback } from "./feedback.js";
 import {
   aggregateChecklistProgress,
   checklistProgress,
@@ -1226,6 +1227,8 @@ export function mount(parent) {
       const line = event.target.closest("[data-check-line]")?.dataset.checkLine;
       if (row || line != null) {
         const index = row ? [...body.querySelectorAll(".checklist .check-row")].indexOf(row) : -1;
+        const wasDone = (row || event.target.closest("[data-check-line]")).classList.contains("is-done");
+        feedback(wasDone ? "uncheck" : "check");
         update((state) => {
           const entry = state.entries.find((item) => item.id === body.dataset.body);
           if (!entry) return state;

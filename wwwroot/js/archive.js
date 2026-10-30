@@ -1,4 +1,5 @@
 import { bridge } from "./bridge.js";
+import { feedback } from "./feedback.js";
 import {
   RICH_RE,
   RICH_SELECTOR,
@@ -773,7 +774,7 @@ function onRowKey(event) {
 }
 
 function toggleRow(row) {
-  row.classList.toggle("is-done");
+  feedback(row.classList.toggle("is-done") ? "check" : "uncheck");
   commitBody();
 }
 
@@ -836,7 +837,7 @@ function onChecklistPointerDown(event) {
     press.held = true;
     press.lifted = true;
     selectChecklist(list);
-    navigator.vibrate?.(12);
+    feedback("hold");
   }, HOLD_MS);
 }
 
@@ -1117,6 +1118,7 @@ function saveDraft() {
     else state.entries.unshift(saved);
     return state;
   });
+  feedback("save");
   closeDrawer();
   if (Number.isFinite(saved.when)) {
     bridge.afterCalendarSave?.(saved.id);
@@ -1285,6 +1287,7 @@ function paintWheels() {
     const top = value * WHEEL_ITEM;
     if (Math.abs(wheel.scrollTop - top) < 1) return;
     wheel.quietUntil = performance.now() + 250;
+    wheel.lastTick = value;
     wheel.scrollTop = top;
   });
 }
@@ -1329,6 +1332,12 @@ function bindWheels(block) {
     wheel.addEventListener("scroll", () => {
       clearTimeout(settle);
       if (!userScroll()) return;
+      // Щелчок на каждом делении, которое проходит мимо центра, — как у механического колеса.
+      const passing = Math.round(wheel.scrollTop / WHEEL_ITEM);
+      if (passing !== wheel.lastTick) {
+        wheel.lastTick = passing;
+        feedback("tick");
+      }
       settle = setTimeout(() => {
         if (!userScroll()) return;
         setWheelValue(wheel.dataset.wheel, wheel.scrollTop / WHEEL_ITEM);
@@ -1475,6 +1484,7 @@ function bindWhenPicker() {
   const moveHand = (event) => {
     if (!whenPick || !whenPick.drag) return;
     const point = clockPoint(event, face);
+    const before = whenPick.hour * 60 + whenPick.minute;
     if (whenPick.drag === "hour") {
       // Стрелка крутится по кругу: переход через 12 меняет первую половину дня на вторую.
       const next = Math.round(point.deg / 30) % 12;
@@ -1486,6 +1496,8 @@ function bindWhenPicker() {
       else if (raw < 0) whenPick.minute = shiftClockHour(-1) ? raw + 60 : 0;
       else whenPick.minute = raw;
     }
+    if (whenPick.hour * 60 + whenPick.minute === before) return;
+    feedback("tick");
     paintClock();
     commitWhen();
   };
@@ -1529,6 +1541,7 @@ function bindDrawer() {
     }
     const status = event.target.closest("[data-status-set]")?.dataset.statusSet;
     if (status) {
+      if (status === "done" && draft.status !== "done") feedback("done");
       draft.status = status;
       paintDrawer();
       return;
@@ -1967,6 +1980,7 @@ export function mount(parent) {
       update((state) => {
         const entry = state.entries.find((item) => item.id === id);
         if (entry) entry.status = NEXT_STATUS[entry.status] || "open";
+        if (entry?.status === "done") feedback("done");
         return state;
       });
       return;

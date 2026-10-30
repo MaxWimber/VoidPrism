@@ -1,4 +1,5 @@
 import { bridge } from "./bridge.js";
+import { feedback } from "./feedback.js";
 import { cardBodyHtml, plainExcerpt } from "./lists.js";
 import { attachSelection } from "./select.js";
 import { getState, update } from "./store.js";
@@ -146,6 +147,7 @@ export function mount(parent) {
         if (entry) {
           entry.status = NEXT[entry.status] || "open";
           entry.updatedAt = Date.now();
+          if (entry.status === "done") feedback("done");
         }
         return state;
       });

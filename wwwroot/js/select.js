@@ -4,6 +4,7 @@
  * и снимают карточки. Внизу — панель «отмена · сколько выбрано · удалить».
  * Режим живёт в одном списке за раз; «назад», Escape и смена вкладки его снимают.
  */
+import { feedback } from "./feedback.js";
 import { update } from "./store.js";
 import { confirmDialog, icons, toast } from "./ui.js";
 
@@ -113,7 +114,7 @@ export function attachSelection(container, { item, idOf = (el) => el.dataset.id 
       if (session && session.container !== container) clearSelection();
       if (!session) session = { container, item, idOf, ids: new Set() };
       toggle(idOf(el));
-      navigator.vibrate?.(12);
+      feedback("hold");
     }, HOLD_MS);
     press = current;
   });

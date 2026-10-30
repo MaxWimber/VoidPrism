@@ -2,6 +2,7 @@
  * Раздел «Настройки» (шестерёнка в навигации): вкладки «Настройки» и «Профиль».
  * Профиль — обычный раздел, не всплывающее окно; имя и подпись сохраняются сами.
  */
+import { feedback, getFeedbackPrefs, setFeedbackPref } from "./feedback.js";
 import { isMobileApp } from "./platform.js";
 import { clearCosmos, getState, update } from "./store.js";
 import { confirmDialog, initial, toast } from "./ui.js";
@@ -57,6 +58,19 @@ export function render() {
     pane.hidden = pane.dataset.pane !== tab;
   });
   if (tab === "profile") paintProfile();
+  else paintSwitches();
+}
+
+const SWITCHES = [
+  ["sound", "Звуки", "Тихие щелчки и сигналы на действия"],
+  ["haptics", "Вибрация", "Короткий отклик при касаниях"],
+];
+
+function paintSwitches() {
+  const prefs = getFeedbackPrefs();
+  root.querySelectorAll("[data-switch]").forEach((button) => {
+    button.setAttribute("aria-checked", String(prefs[button.dataset.switch]));
+  });
 }
 
 function saveField(input) {
@@ -94,7 +108,13 @@ export function mount(parent) {
       ${TABS.map(([id, label]) => `<button type="button" data-settings-tab="${id}">${label}</button>`).join("")}
     </div>
     <div class="settings-pane" data-pane="settings">
-      <div class="empty slim"><strong>Пока пусто</strong><span>Здесь появятся настройки приложения.</span></div>
+      <div class="settings-group">
+        ${SWITCHES.map(([key, label, hint]) => `
+          <button type="button" class="switch-row" role="switch" data-switch="${key}" aria-checked="true">
+            <span class="switch-text"><strong>${label}</strong><small>${hint}</small></span>
+            <span class="switch" aria-hidden="true"></span>
+          </button>`).join("")}
+      </div>
     </div>
     <div class="settings-pane profile-pane" data-pane="profile" hidden>
       <div class="profile-card">
@@ -127,6 +147,15 @@ export function mount(parent) {
     });
   }
   root.querySelector("[data-clear]").addEventListener("click", clearAll);
+  root.querySelector(".settings-group").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-switch]");
+    if (!button) return;
+    const on = button.getAttribute("aria-checked") !== "true";
+    setFeedbackPref(button.dataset.switch, on);
+    paintSwitches();
+    // Включили — сразу слышно и чувствуется, каким будет отклик.
+    if (on) feedback("check");
+  });
 }
 
 export function setActive(on) {

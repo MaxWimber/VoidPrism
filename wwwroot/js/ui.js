@@ -1,3 +1,5 @@
+import { feedback } from "./feedback.js";
+
 export const TONES = ["cyan", "violet", "rose", "amber", "mint"];
 
 const TONE_COLOR = {
@@ -155,6 +157,7 @@ export function confirmDialog({ title, text, confirmLabel = "Подтверди�
         finish(false);
       } else if (event.key === "Enter") {
         event.preventDefault();
+        if (danger) feedback("remove");
         finish(true);
       }
     };
@@ -162,7 +165,10 @@ export function confirmDialog({ title, text, confirmLabel = "Подтверди�
       if (event.target === back) finish(false);
       const act = event.target.closest("[data-act]")?.dataset.act;
       if (act === "no") finish(false);
-      if (act === "yes") finish(true);
+      if (act === "yes") {
+        if (danger) feedback("remove");
+        finish(true);
+      }
     });
     modalFinish = finish;
     document.addEventListener("keydown", onKey, true);
