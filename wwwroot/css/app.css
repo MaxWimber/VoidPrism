@@ -916,10 +916,10 @@ h1 {
 }
 
 .body-preview .check-item,
-.card-body .check-item { cursor: pointer; }
+.dossier-body .check-item { cursor: pointer; }
 
 .body-preview .check-item:hover .check-box,
-.card-body .check-item:hover .check-box {
+.dossier-body .check-item:hover .check-box {
   box-shadow: inset 0 0 0 1.5px var(--cyan);
 }
 
@@ -1271,8 +1271,8 @@ svg.is-live .guide {
   margin-bottom: 6px;
 }
 
-.dossier-head .sheet-back {
-  margin: 0 0 0 -8px;
+.dossier-head .icon-btn {
+  margin-left: -2px;
 }
 
 .dossier-tools {
@@ -2465,8 +2465,8 @@ kbd {
   min-height: 40px;
 }
 
-.settings-head .sheet-back {
-  margin: 0 0 0 -8px;
+.settings-head .icon-btn {
+  margin-left: -2px;
 }
 
 .settings-tools {
@@ -2495,4 +2495,58 @@ kbd {
 
 .editor-settings .field-error:empty {
   display: none;
+}
+
+/* Выбор записей удержанием: отмеченные карточки и панель действий внизу. */
+.is-picked-item {
+  position: relative;
+  box-shadow: inset 0 0 0 2px var(--cyan), 0 0 0 1px rgba(126, 231, 255, 0.25) !important;
+}
+
+.is-picked-item::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071018' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8'/%3E%3C/svg%3E") center / 13px no-repeat,
+    var(--cyan);
+  pointer-events: none;
+}
+
+.select-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 18px;
+  background: #151a33;
+  box-shadow: inset 0 0 0 1px var(--line), 0 12px 32px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+}
+
+.select-bar[hidden] { display: none; }
+
+.select-count {
+  min-width: 96px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.select-bar .is-danger { color: var(--rose); }
+
+body.is-selecting .fab { display: none; }
+
+.card,
+.wish-card,
+.cal-panel-card,
+.entry-row {
+  -webkit-touch-callout: none;
 }

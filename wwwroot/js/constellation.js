@@ -1,7 +1,16 @@
 import { bridge } from "./bridge.js";
-import { aggregateChecklistProgress, checklistProgress, plainBody, progressArc, progressBadgeHtml } from "./lists.js";
+import {
+  aggregateChecklistProgress,
+  checklistProgress,
+  fullBodyHtml,
+  progressArc,
+  progressBadgeHtml,
+  toggleCheckLine,
+  toggleCheckRow,
+} from "./lists.js";
 import { attachPinch } from "./pinch.js";
 import { isMobileApp } from "./platform.js";
+import { attachSelection } from "./select.js";
 import { getState, themesOf, update } from "./store.js";
 import { esc, formatDate, icons, toneColor, toneFor, toast } from "./ui.js";
 
@@ -735,7 +744,7 @@ function dossierHead(docked, { back = true, actions = "" } = {}) {
   if (!showBack && !actions) return "";
   return `
     <div class="dossier-head">
-      ${showBack ? `<button type="button" class="date-plain sheet-back" data-back>Назад</button>` : "<span></span>"}
+      ${showBack ? `<button type="button" class="icon-btn" data-back aria-label="Назад">${icons.back}</button>` : "<span></span>"}
       <div class="dossier-tools">${actions}</div>
     </div>`;
 }
@@ -812,7 +821,7 @@ function drawDossier() {
         ${(entry.tags || []).map((tag) => `<button type="button" class="chip" data-pick="${esc(tag)}">#${esc(tag)}</button>`).join("")}
       </div>
       ${progress ? progressBadgeHtml(progress) : ""}
-      <p class="lede">${esc(short(plainBody(entry.body).replace(/\s+/g, " ").trim() || "Без текста", 220))}</p>`;
+      <div class="card-body body-render dossier-body face-${esc(entry.textStyle?.family || "sans")} size-${esc(entry.textStyle?.size || "m")}" data-body="${esc(entry.id)}">${fullBodyHtml(entry.body) || `<p class="hint">Без текста</p>`}</div>`;
     syncSheet();
     return;
   }
@@ -977,6 +986,7 @@ export function mount(parent) {
   sky = root.querySelector(".sky");
   svg = root.querySelector(".sky-map");
   dossier = root.querySelector(".dossier");
+  attachSelection(dossier, { item: ".entry-row", idOf: (el) => el.dataset.selectEntry });
   legend = root.querySelector(".legend");
   zoomLabel = root.querySelector(".sky-zoom-label");
 
@@ -1208,6 +1218,23 @@ export function mount(parent) {
     if (selectEntry) {
       goTo({ type: "entry", id: selectEntry });
       return;
+    }
+    // Чекбоксы в просмотре записи отмечаются прямо здесь — и блоки, и старые строки «- [ ]».
+    const body = event.target.closest("[data-body]");
+    if (body) {
+      const row = event.target.closest(".checklist .check-row");
+      const line = event.target.closest("[data-check-line]")?.dataset.checkLine;
+      if (row || line != null) {
+        const index = row ? [...body.querySelectorAll(".checklist .check-row")].indexOf(row) : -1;
+        update((state) => {
+          const entry = state.entries.find((item) => item.id === body.dataset.body);
+          if (!entry) return state;
+          entry.body = row ? toggleCheckRow(entry.body, index) : toggleCheckLine(entry.body, Number(line));
+          entry.updatedAt = Date.now();
+          return state;
+        });
+        return;
+      }
     }
     const open = event.target.closest("[data-open]")?.dataset.open;
     if (open) bridge.openEntry?.(open);

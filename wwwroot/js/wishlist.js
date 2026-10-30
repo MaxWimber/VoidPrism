@@ -1,5 +1,6 @@
 import { bridge } from "./bridge.js";
 import { cardBodyHtml, plainExcerpt } from "./lists.js";
+import { attachSelection } from "./select.js";
 import { getState, update } from "./store.js";
 import { esc, formatDate, icons } from "./ui.js";
 
@@ -116,6 +117,7 @@ export function mount(parent) {
   parent.append(root);
   filterEl = root.querySelector(".filters");
   listEl = root.querySelector(".wish-scroll");
+  attachSelection(listEl, { item: ".wish-card" });
 
   root.querySelector("[data-new]").addEventListener("click", () => {
     bridge.newWish?.();

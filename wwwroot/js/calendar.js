@@ -1,4 +1,5 @@
 import { bridge } from "./bridge.js";
+import { attachSelection } from "./select.js";
 import { getState } from "./store.js";
 import {
   dayKey,
@@ -536,6 +537,7 @@ export function mount(parent) {
   parent.append(root);
   boardEl = root.querySelector(".cal-board");
   panelEl = root.querySelector(".cal-panel");
+  attachSelection(panelEl, { item: ".cal-panel-card" });
   titleEl = root.querySelector(".cal-title");
 
   root.querySelector("[data-modes]").addEventListener("click", (event) => {

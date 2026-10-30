@@ -5,6 +5,7 @@ import * as canvas from "./canvas.js";
 import * as constellation from "./constellation.js";
 import * as wishlist from "./wishlist.js";
 import { isMobileApp } from "./platform.js";
+import { clearSelection, isSelecting } from "./select.js";
 import { bootstrap, clearCosmos, getState, subscribe, update } from "./store.js";
 import { syncStatus } from "./sync.js";
 import { confirmDialog, dismissModal, icons, initial, isModalOpen, isTyping, startOfDay, toast } from "./ui.js";
@@ -117,6 +118,7 @@ let current = "constellation";
 const visited = [];
 
 function show(view, { fromBack = false } = {}) {
+  clearSelection();
   if (!fromBack && shellReady && view !== current) {
     visited.push(current);
     if (visited.length > 30) visited.shift();
@@ -202,6 +204,10 @@ function wire() {
   });
   window.addEventListener("keydown", (event) => {
     if (isModalOpen()) return;
+    if (event.key === "Escape" && isSelecting()) {
+      clearSelection();
+      return;
+    }
     if (archive.isEditorOpen() && event.key === "Escape") {
       archive.keydown(event);
       return;
@@ -332,6 +338,10 @@ function handleBack() {
   if (!shellReady) return false;
   if (isModalOpen()) {
     dismissModal();
+    return true;
+  }
+  if (isSelecting()) {
+    clearSelection();
     return true;
   }
   if (archive.handleBack()) return true;

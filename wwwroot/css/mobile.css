@@ -691,3 +691,15 @@ h1 {
 .cal-block strong {
   font-size: 8px !important;
 }
+/* Удержание на карточке выбирает её, а не выделяет текст. */
+.card,
+.wish-card,
+.cal-panel-card,
+.entry-row {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.select-bar {
+  bottom: calc(12px + var(--nav-block));
+}

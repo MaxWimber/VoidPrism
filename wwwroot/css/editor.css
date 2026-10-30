@@ -352,19 +352,30 @@ body:not(.is-mobile-app) .text-dock-panel {
   box-sizing: border-box;
 }
 
-.when-sheet {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  overflow: auto;
-  padding: 12px 16px 24px;
-  background: #0a0c1c;
+/* Дата и время — блок внутри настроек записи (только у задач и событий). */
+.when-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
-.when-sheet[hidden],
-.when-day[hidden],
-.when-clock[hidden] {
+.when-block[hidden] {
   display: none !important;
+}
+
+.when-block .when-week {
+  margin-top: 6px;
+}
+
+.when-clear {
+  align-self: center;
+  margin-top: 8px;
+}
+
+.when-clear[hidden] {
+  display: none;
 }
 
 .when-month,
@@ -548,12 +559,45 @@ body:not(.is-mobile-app) .text-dock-panel {
 }
 
 /* «Назад» в шторках даты и настроек — одна и та же кнопка в левом верхнем углу. */
-.sheet-back {
-  align-self: flex-start;
-  display: block;
-  margin: 0 0 8px -8px;
-  color: var(--cyan);
-  font-size: 15px;
+/* Блок меток: пока вводят метку — все метки видны с переносом; после —
+   одна строка с прокруткой и строка ввода под ней. Отступы между строками
+   такие же, как между метками в строке. */
+.editor-settings .tag-editor {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.editor-settings .tag-editor .chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.editor-settings .tag-editor .chips::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-settings .tag-editor .chips:empty {
+  display: none;
+}
+
+.editor-settings .tag-editor.is-editing .chips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.editor-settings .tag-chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.editor-settings .tag-editor input {
+  flex: none;
+  width: 100%;
+  min-width: 0;
 }
 
 /* --- Блок чеклиста: в тексте заметки и на карточках --- */
@@ -680,4 +724,20 @@ body:not(.is-mobile-app) .text-dock-panel {
 .card-body .checklist,
 .wish-body .checklist {
   padding: 4px 6px;
+}
+
+/* На карточках архива и желаний чекбоксы только показываются; отмечают их в записи. */
+.card .check-row,
+.wish-card .check-row {
+  cursor: inherit;
+}
+
+/* Просмотр записи — текст целиком, без обрезки, как у карточек архива. */
+.dossier-body {
+  flex: none;
+  max-height: none;
+  overflow: visible;
+  margin-top: 12px;
+  color: var(--ink);
+  line-height: 1.55;
 }

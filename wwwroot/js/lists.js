@@ -411,6 +411,13 @@ export function cardBodyHtml(body) {
   return sanitizeBody(raw);
 }
 
+/** HTML тела заметки целиком, без сокращений: для просмотра записи. */
+export function fullBodyHtml(body) {
+  const raw = String(body || "");
+  if (!RICH_RE.test(raw)) return renderBody(raw);
+  return sanitizeBody(raw);
+}
+
 function polar(cx, cy, radius, angle) {
   return {
     x: cx + radius * Math.cos(angle),

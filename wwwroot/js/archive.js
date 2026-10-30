@@ -13,10 +13,9 @@ import {
   progressBadgeHtml,
   rewriteListLines,
   sanitizeBody,
-  toggleCheckLine,
-  toggleCheckRow,
   unwrapNode,
 } from "./lists.js";
+import { attachSelection } from "./select.js";
 import { getState, update } from "./store.js";
 import {
   confirmDialog,
@@ -215,7 +214,7 @@ function closeDrawer() {
   savedRange = null;
   pickedImage = null;
   resetChecklistState();
-  closeWhenPicker();
+  whenPick = null;
   drawerEl.classList.remove("is-open");
   drawerEl.querySelector(".drawer")?.classList.remove("is-settings");
 }
@@ -1052,6 +1051,7 @@ function paintDrawer() {
   statusRow.hidden = !showStatus;
   const priorityRow = drawerEl.querySelector(".priority-row");
   if (priorityRow) priorityRow.hidden = draft.kind !== "wish";
+  if (!whenPick) initWhen();
   paintDateLabel();
   const labels = statusLabels(draft.kind);
   drawerEl.querySelectorAll("[data-status-set]").forEach((button) => {
@@ -1077,6 +1077,7 @@ export function openEditor(id, preset = {}) {
   draft = existing ? structuredClone(existing) : blank(preset);
   snapshot = JSON.stringify(draft);
   textTool = "";
+  whenPick = null;
   drawerEl.classList.add("is-open");
   drawerEl.querySelector(".drawer")?.classList.remove("is-settings");
   paintDrawer();
@@ -1103,7 +1104,9 @@ function saveDraft() {
     else delete saved.when;
   }
   if (saved.kind === "event" && !Number.isFinite(saved.when)) {
-    openWhenPicker();
+    openSettings("date");
+    const error = drawerEl.querySelector(".editor-settings .field-error");
+    if (error) error.textContent = "Выберите дату события.";
     return;
   }
   saved.textStyle = textStyle();
@@ -1139,44 +1142,49 @@ async function deleteDraft() {
   closeDrawer();
 }
 
+// Дата и время — часть настроек записи, и только у задач и событий.
+// Выбор дня, движение стрелок и ввод времени сразу записываются в черновик.
 let whenPick = null;
+
+function hasDate() {
+  return draft?.kind === "task" || draft?.kind === "event";
+}
+
+function formatWhen(ts) {
+  const date = new Date(ts);
+  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date).replace(".", "");
+  return `${day}, ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
 
 function paintDateLabel() {
   const button = drawerEl.querySelector("[data-pick-date]");
-  const clear = drawerEl.querySelector("[data-clear-date]");
   if (!button || !draft) return;
-  const hidden = draft.kind === "wish";
-  button.hidden = hidden;
-  const hasWhen = Number.isFinite(draft.when) && !hidden;
-  if (clear) clear.hidden = !hasWhen;
-  if (!hasWhen) {
-    button.textContent = "Дата";
-    return;
-  }
-  const date = new Date(draft.when);
-  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date).replace(".", "");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  button.textContent = `${day}, ${hh}:${mm}`;
+  button.hidden = !hasDate();
+  button.textContent = Number.isFinite(draft.when) ? formatWhen(draft.when) : "Дата";
+  const block = drawerEl.querySelector(".when-block");
+  if (block) block.hidden = !hasDate();
+  const clear = drawerEl.querySelector("[data-clear-date]");
+  if (clear) clear.hidden = !Number.isFinite(draft.when);
 }
 
-function openWhenPicker() {
-  const base = Number.isFinite(draft.when) ? new Date(draft.when) : new Date();
+/** Календарь и часы по черновику. Без даты — текущий месяц и час, день не отмечен. */
+function initWhen() {
+  const has = Number.isFinite(draft?.when);
+  const base = has ? new Date(draft.when) : new Date();
   whenPick = {
     cursor: new Date(base.getFullYear(), base.getMonth(), 1).getTime(),
-    day: new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime(),
+    day: has ? new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime() : null,
     hour: base.getHours(),
-    minute: base.getMinutes(),
+    minute: has ? base.getMinutes() : 0,
     drag: "",
   };
-  drawerEl.querySelector(".when-sheet").hidden = false;
   paintWhenPicker();
 }
 
-function closeWhenPicker() {
-  whenPick = null;
-  const sheet = drawerEl.querySelector(".when-sheet");
-  if (sheet) sheet.hidden = true;
+function openSettings(focus) {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  drawerEl.querySelector(".drawer")?.classList.add("is-settings");
+  if (focus === "date") drawerEl.querySelector(".when-block")?.scrollIntoView({ block: "start" });
 }
 
 function paintMonth() {
@@ -1249,6 +1257,7 @@ function commitClockInput() {
   }
   readout.value = clockText();
   paintClock();
+  commitWhen();
 }
 
 function paintWhenPicker() {
@@ -1265,13 +1274,20 @@ function shiftClockHour(delta) {
   return moved;
 }
 
+/** Записывает выбранные день и время в черновик. День не выбран — берём сегодня. */
 function commitWhen() {
-  if (document.activeElement?.classList.contains("when-clock-readout")) commitClockInput();
+  if (!whenPick || !draft) return;
+  if (whenPick.day == null) {
+    const now = new Date();
+    whenPick.day = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  }
   const date = new Date(whenPick.day);
   date.setHours(whenPick.hour, whenPick.minute, 0, 0);
   draft.when = date.getTime();
+  const error = drawerEl.querySelector(".editor-settings .field-error");
+  if (error) error.textContent = "";
   paintDateLabel();
-  closeWhenPicker();
+  paintMonth();
 }
 
 function clockPoint(event, face) {
@@ -1297,17 +1313,20 @@ function shortDelta(next, prev, span) {
 }
 
 function bindWhenPicker() {
-  const sheet = drawerEl.querySelector(".when-sheet");
-  const face = sheet.querySelector("[data-clock]");
+  const block = drawerEl.querySelector(".when-block");
+  const face = block.querySelector("[data-clock]");
   drawerEl.querySelector("[data-pick-date]").addEventListener("click", (event) => {
     event.stopPropagation();
-    openWhenPicker();
+    openSettings("date");
   });
-  sheet.addEventListener("click", (event) => {
+  block.addEventListener("click", (event) => {
     event.stopPropagation();
     if (!whenPick) return;
-    if (event.target.closest("[data-when-back]")) {
-      commitWhen();
+    if (event.target.closest("[data-clear-date]")) {
+      delete draft.when;
+      whenPick.day = null;
+      paintDateLabel();
+      paintMonth();
       return;
     }
     const shift = event.target.closest("[data-month]")?.dataset.month;
@@ -1323,13 +1342,8 @@ function bindWhenPicker() {
       whenPick.day = Number(day);
       const picked = new Date(whenPick.day);
       whenPick.cursor = new Date(picked.getFullYear(), picked.getMonth(), 1).getTime();
-      paintWhenPicker();
+      commitWhen();
     }
-  });
-  drawerEl.querySelector("[data-clear-date]").addEventListener("click", (event) => {
-    event.stopPropagation();
-    delete draft.when;
-    paintDateLabel();
   });
   const pickHand = (point) => {
     const nearHour = angleDist(point.deg, hourAngle());
@@ -1353,6 +1367,7 @@ function bindWhenPicker() {
       else whenPick.minute = raw;
     }
     paintClock();
+    commitWhen();
   };
   face.addEventListener("pointerdown", (event) => {
     if (!whenPick) return;
@@ -1370,7 +1385,7 @@ function bindWhenPicker() {
   };
   face.addEventListener("pointerup", releaseHand);
   face.addEventListener("pointercancel", releaseHand);
-  const readout = sheet.querySelector(".when-clock-readout");
+  const readout = block.querySelector(".when-clock-readout");
   readout.addEventListener("focus", () => readout.select());
   readout.addEventListener("input", () => {
     const digits = readout.value.replace(/\D/g, "").slice(0, 4);
@@ -1396,7 +1411,11 @@ function bindDrawer() {
       draft.kind = kind;
       if (kind === "wish" && !draft.priority) draft.priority = 2;
       if (kind !== "wish") delete draft.priority;
-      if (kind === "wish") delete draft.when;
+      // У заметок и желаний даты нет — при смене типа она снимается.
+      if (kind === "wish" || kind === "note") {
+        delete draft.when;
+        whenPick = null;
+      }
       paintDrawer();
       return;
     }
@@ -1474,8 +1493,7 @@ function bindDrawer() {
       return;
     }
     if (event.target.closest("[data-settings]")) {
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      drawerEl.querySelector(".drawer")?.classList.add("is-settings");
+      openSettings();
       return;
     }
     if (event.target.closest("[data-settings-back]")) {
@@ -1572,6 +1590,10 @@ function bindDrawer() {
   });
   bindWhenPicker();
   const tagInput = drawerEl.querySelector(".tag-input");
+  // Пока вводят метку — все метки видны целиком; после — сворачиваются в строку с прокруткой.
+  const tagEditor = drawerEl.querySelector(".tag-editor");
+  tagInput.addEventListener("focus", () => tagEditor.classList.add("is-editing"));
+  tagInput.addEventListener("blur", () => tagEditor.classList.remove("is-editing"));
   tagInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
       event.preventDefault();
@@ -1628,6 +1650,7 @@ export function mount(parent) {
   filterEl = root.querySelector(".filters");
   railEl = root.querySelector(".tag-rail");
   cardsEl = root.querySelector(".cards");
+  attachSelection(cardsEl, { item: ".card" });
   filterEl.innerHTML = FILTERS.map(([id, label]) => `<button type="button" class="chip" data-filter="${id}">${label}</button>`).join("");
 
   drawerEl = document.createElement("div");
@@ -1636,11 +1659,8 @@ export function mount(parent) {
     <div class="drawer editor-sheet" role="dialog" aria-modal="true" aria-labelledby="editor-label">
       <div class="editor-main">
         <div class="editor-top">
-          <button type="button" class="icon-btn" data-done aria-label="Сохранить и закрыть">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5 8 12l7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <button type="button" class="icon-btn" data-done aria-label="Сохранить и закрыть">${icons.back}</button>
           <div class="editor-top-side">
-            <button type="button" class="date-clear" data-clear-date hidden aria-label="Убрать дату">×</button>
             <button type="button" class="date-plain" data-pick-date>Дата</button>
             <button type="button" class="icon-btn" data-settings aria-label="Настройки записи">${icons.settings}</button>
           </div>
@@ -1728,7 +1748,7 @@ export function mount(parent) {
       </div>
       <div class="editor-settings">
         <div class="settings-head">
-          <button type="button" class="date-plain sheet-back" data-settings-back>Назад</button>
+          <button type="button" class="icon-btn" data-settings-back aria-label="Назад">${icons.back}</button>
           <div class="settings-tools">
             <button type="button" class="icon-tool" data-pin-toggle aria-pressed="false" title="Закрепить в архиве" aria-label="Закрепить в архиве">${icons.pin}</button>
             <button type="button" class="icon-tool" data-constellation title="В созвездие" aria-label="В созвездие">${icons.orbit}</button>
@@ -1760,10 +1780,7 @@ export function mount(parent) {
           <div class="chips"></div>
           <input class="tag-input" type="text" maxlength="32" placeholder="Метка и Enter" aria-label="Новая метка" />
         </div>
-      </div>
-      <div class="when-sheet" hidden>
-        <button type="button" class="date-plain sheet-back" data-when-back>Назад</button>
-        <div class="when-day">
+        <div class="when-block" hidden>
           <div class="when-month">
             <button type="button" class="date-plain" data-month="-1" aria-label="Предыдущий месяц">‹</button>
             <span data-month-title></span>
@@ -1771,15 +1788,16 @@ export function mount(parent) {
           </div>
           <div class="when-week">${["пн","вт","ср","чт","пт","сб","вс"].map((day) => `<span>${day}</span>`).join("")}</div>
           <div class="when-grid"></div>
-        </div>
-        <div class="when-clock">
-          <input class="when-clock-readout" type="text" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Время, часы и минуты" value="00:00" />
-          <div class="clock-face" data-clock>
-            ${Array.from({ length: 60 }, (_, index) => `<span class="clock-tick${index % 5 ? "" : " is-hour"}" style="transform: rotate(${index * 6}deg)"><i></i></span>`).join("")}
-            <div class="clock-hand hour"></div>
-            <div class="clock-hand minute"></div>
-            <i class="clock-cap"></i>
+          <div class="when-clock">
+            <input class="when-clock-readout" type="text" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Время, часы и минуты" value="00:00" />
+            <div class="clock-face" data-clock>
+              ${Array.from({ length: 60 }, (_, index) => `<span class="clock-tick${index % 5 ? "" : " is-hour"}" style="transform: rotate(${index * 6}deg)"><i></i></span>`).join("")}
+              <div class="clock-hand hour"></div>
+              <div class="clock-hand minute"></div>
+              <i class="clock-cap"></i>
+            </div>
           </div>
+          <button type="button" class="chip when-clear" data-clear-date hidden>Без даты</button>
         </div>
       </div>
     </div>`;
@@ -1815,35 +1833,6 @@ export function mount(parent) {
     const card = event.target.closest(".card");
     if (!card) return;
     const id = card.dataset.id;
-    const checkRow = event.target.closest(".checklist .check-row");
-    if (checkRow) {
-      event.preventDefault();
-      event.stopPropagation();
-      const index = [...card.querySelectorAll(".checklist .check-row")].indexOf(checkRow);
-      update((state) => {
-        const entry = state.entries.find((item) => item.id === id);
-        if (entry) {
-          entry.body = toggleCheckRow(entry.body, index);
-          entry.updatedAt = Date.now();
-        }
-        return state;
-      });
-      return;
-    }
-    const checkLine = event.target.closest("[data-check-line]")?.dataset.checkLine;
-    if (checkLine != null) {
-      event.preventDefault();
-      event.stopPropagation();
-      update((state) => {
-        const entry = state.entries.find((item) => item.id === id);
-        if (entry) {
-          entry.body = toggleCheckLine(entry.body, Number(checkLine));
-          entry.updatedAt = Date.now();
-        }
-        return state;
-      });
-      return;
-    }
     if (event.target.closest("[data-pin]")) {
       update((state) => {
         const entry = state.entries.find((item) => item.id === id);
@@ -1906,12 +1895,9 @@ export function isEditorOpen() {
 
 /** Закрывает верхний слой редактора (дата, настройки, правка чеклиста). false — слоёв нет. */
 function closeEditorLayer() {
-  if (whenPick) {
-    commitWhen();
-    return true;
-  }
   const drawer = drawerEl.querySelector(".drawer");
   if (drawer?.classList.contains("is-settings")) {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     drawer.classList.remove("is-settings");
     return true;
   }
