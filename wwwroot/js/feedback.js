@@ -42,7 +42,9 @@ function context() {
 }
 
 // Браузер разрешает звук только после касания: будим контекст первым же нажатием.
-window.addEventListener("pointerdown", () => prefs.sound && context(), { capture: true, passive: true });
+window.addEventListener("pointerdown", () => {
+  if (prefs.sound && !window.VoidPrismAndroid?.sound) context();
+}, { capture: true, passive: true });
 
 /** Короткий тон: частота, длительность (с), громкость, форма волны, сдвиг частоты к концу. */
 function tone(ctx, { freq, at = 0, dur = 0.08, gain = 0.06, type = "sine", glide = 1 }) {
@@ -83,7 +85,7 @@ const SOUNDS = {
 
 // --- вибрация ---
 
-// На Android — системный тактильный отклик (как у штатных часов и клавиатуры), иначе Vibration API.
+// На Android — вибромотор через приложение (WebView сам navigator.vibrate не поддерживает), иначе Vibration API.
 const VIBRATE_MS = { tick: 4, check: 10, uncheck: 6, save: 12, done: [10, 40, 14], hold: 18, remove: [14, 30, 20] };
 
 function vibrate(kind) {
@@ -106,6 +108,12 @@ export function feedback(kind) {
   last[kind] = now;
   if (prefs.haptics) vibrate(kind);
   if (prefs.sound && document.visibilityState === "visible") {
+    // На Android звук играет само приложение системным потоком, а не WebView как мультимедиа.
+    const android = window.VoidPrismAndroid;
+    if (android?.sound) {
+      android.sound(kind);
+      return;
+    }
     const ctx = context();
     if (ctx && ctx.state === "running") SOUNDS[kind]?.(ctx);
   }

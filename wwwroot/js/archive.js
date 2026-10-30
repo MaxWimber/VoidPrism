@@ -24,6 +24,7 @@ import {
   formatDate,
   icons,
   toneColor,
+  toast,
   toneFor,
   uid,
 } from "./ui.js";
@@ -227,18 +228,21 @@ function syncDraftFields() {
 }
 
 /** Выход из редактора с сохранением: стрелка «назад» в шапке и системный жест «назад». */
-function finishEditor() {
+/** Сохраняет запись. stay — кнопка «Сохранить»: запись остаётся открытой. */
+function finishEditor({ stay = false } = {}) {
   if (editingList) stopChecklistEdit();
   syncDraftFields();
   // Открыли и закрыли без правок — ничего не пишем, дата изменения остаётся прежней.
   if (!isDirty() && getState().entries.some((entry) => entry.id === draft.id)) {
-    closeDrawer();
+    if (stay) toast("Уже сохранено");
+    else closeDrawer();
     return;
   }
   if (!draft.title.trim()) {
     const body = bodyEl();
     if (!hasContent(body)) {
-      closeDrawer();
+      if (stay) toast("Пустую запись не сохранить");
+      else closeDrawer();
       return;
     }
     // Без названия запись не теряем: берём первую строку текста.
@@ -246,7 +250,7 @@ function finishEditor() {
     draft.title = (first || "Без названия").slice(0, 60);
     drawerEl.querySelector(".title-input").value = draft.title;
   }
-  saveDraft();
+  saveDraft({ stay });
 }
 
 async function requestClose() {
@@ -1084,7 +1088,7 @@ export function openEditor(id, preset = {}) {
   paintDrawer();
 }
 
-function saveDraft() {
+function saveDraft({ stay = false } = {}) {
   syncDraftFields();
   const title = draft.title.trim();
   drawerEl.querySelector(".drawer")?.classList.remove("is-settings");
@@ -1119,6 +1123,14 @@ function saveDraft() {
     return state;
   });
   feedback("save");
+  if (stay) {
+    // Остаёмся в записи: всё, что сейчас на экране, считается сохранённым.
+    draft.title = title;
+    draft.updatedAt = saved.updatedAt;
+    snapshot = JSON.stringify(draft);
+    toast("Сохранено");
+    return;
+  }
   closeDrawer();
   if (Number.isFinite(saved.when)) {
     bridge.afterCalendarSave?.(saved.id);
@@ -1622,6 +1634,7 @@ function bindDrawer() {
       return;
     }
     if (event.target.closest("[data-done]")) finishEditor();
+    if (event.target.closest("[data-save]")) finishEditor({ stay: true });
     if (event.target.closest("[data-cancel]")) requestClose();
     if (event.target.closest("[data-delete]")) deleteDraft();
     if (event.target.closest("[data-constellation]")) {
@@ -1749,9 +1762,6 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view archive-view";
   root.innerHTML = `
-    <header class="view-head">
-      <h1>Архив</h1>
-    </header>
     <button type="button" class="fab" data-new title="Новая запись (N)" aria-label="Новая запись">${icons.plus}</button>
     <div class="welcome">
       <p>Стартовая вселенная уже размечена. Перепишите записи под себя или очистите их в профиле — созвездие соберётся заново из ваших меток.</p>
@@ -1797,6 +1807,7 @@ export function mount(parent) {
             <button type="button" data-cl="delete" aria-label="Удалить список"></button>
           </div>
           <div class="text-dock" aria-label="Настройки текста">
+            <button type="button" class="dock-btn dock-save" data-save aria-label="Сохранить" title="Сохранить">${icons.save}</button>
             <div class="text-dock-masters">
               <button type="button" class="dock-btn" data-tool="list" aria-label="Тип списка">${icons.bullets}</button>
               <button type="button" class="dock-btn dock-aa" data-tool="format" aria-label="Формат текста">Aa</button>

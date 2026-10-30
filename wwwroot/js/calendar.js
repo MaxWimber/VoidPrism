@@ -20,12 +20,6 @@ const HOUR_PX = 44;
 const MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 const MAX_CUBES = 9;
 
-const MODES = [
-  ["plan", "План"],
-  ["journal", "Журнал"],
-  ["events", "События"],
-];
-
 const VIEWS = [
   ["month", "Месяц"],
   ["week", "Неделя"],
@@ -37,9 +31,7 @@ let boardEl;
 let panelEl;
 let titleEl;
 let active = false;
-let mode = "plan";
 let view = "month";
-let journalField = "createdAt";
 let cursor = startOfDay(Date.now());
 let selectedDay = dayKey(Date.now());
 // Откуда пришли в «День» тапом по дню месяца/недели — туда вернёт системный «назад».
@@ -92,21 +84,11 @@ function stampFor(key, hour = null) {
 }
 
 function entryStamp(entry) {
-  if (mode === "journal") {
-    const value = entry[journalField] ?? entry.createdAt;
-    return Number.isFinite(value) ? value : null;
-  }
   return Number.isFinite(entry.when) ? entry.when : null;
 }
 
 function visibleEntries() {
   const entries = getState().entries;
-  if (mode === "events") {
-    return entries.filter((entry) => entry.kind === "event" && Number.isFinite(entry.when));
-  }
-  if (mode === "journal") {
-    return entries.filter((entry) => entry.kind === "note" || entry.kind === "task");
-  }
   return entries.filter((entry) => {
     if (entry.kind === "event") return Number.isFinite(entry.when);
     if (entry.kind === "note" || entry.kind === "task") return Number.isFinite(entry.when);
@@ -162,17 +144,9 @@ function weekDays(anchor) {
   });
 }
 
-function defaultKind() {
-  if (mode === "events") return "event";
-  if (mode === "journal") return "note";
-  return "task";
-}
-
 function createForDay(key, hour = null) {
   selectedDay = key;
-  const when = stampFor(key, hour);
-  const kind = defaultKind();
-  bridge.newEntry?.({ kind, when, tags: kind === "event" ? [] : undefined });
+  bridge.newEntry?.({ kind: "task", when: stampFor(key, hour) });
 }
 
 function openEntry(id) {
@@ -192,17 +166,10 @@ function showsToday() {
 }
 
 function paintChrome() {
-  const modeBar = root.querySelector("[data-modes]");
   const viewBar = root.querySelector("[data-views]");
-  const sort = root.querySelector("[data-journal-toggle]");
-  modeBar.innerHTML = MODES.map(([id, label]) => `
-    <button type="button" class="chip ${mode === id ? "is-on" : ""}" data-mode="${id}">${label}</button>
-  `).join("");
   viewBar.innerHTML = VIEWS.map(([id, label]) => `
     <button type="button" class="${view === id ? "is-on" : ""}" data-view-mode="${id}" aria-pressed="${view === id}">${label}</button>
   `).join("");
-  sort.hidden = mode !== "journal";
-  sort.innerHTML = `<span aria-hidden="true">⇅</span> ${journalField === "createdAt" ? "по созданию" : "по изменению"}`;
   root.querySelector("[data-today]").hidden = showsToday();
   titleEl.classList.toggle("is-zoomable", view === "month");
   if (view === "day") {
@@ -386,7 +353,7 @@ function paintPanel(map) {
         <article class="cal-panel-card tone-${kindTone(entry.kind)}" data-id="${esc(entry.id)}">
           <div class="cal-panel-meta">
             <span>${esc(kindLabel(entry.kind))}</span>
-            <span>${esc(mode === "journal" && !hasClockTime(entry._stamp) ? "запись дня" : formatTime(entry._stamp))}</span>
+            <span>${esc(formatTime(entry._stamp))}</span>
           </div>
           <h3>${esc(entry.title)}</h3>
           ${entry.tags?.length ? `<div class="card-tags">${entry.tags.map((tag) => `<span class="mini-tag">#${esc(tag)}</span>`).join("")}</div>` : ""}
@@ -447,7 +414,6 @@ function shift(step) {
 }
 
 export function openDay(ts) {
-  mode = "plan";
   view = "day";
   dayFrom = null;
   hourFilter = null;
@@ -467,13 +433,13 @@ export function handleBack() {
 }
 
 // --- Перелистывание жестами ---
-// «День» и «Неделя» листаются горизонтальным свайпом, «Месяц» — вертикальным.
+// Месяц, неделя и день листаются горизонтальным свайпом (стрелок нет — жест и есть навигация).
 // Содержимое едет за пальцем; отпустили дальше порога — показываем соседний период.
 
 const SWIPE_COMMIT = 56;
 
 function swipeAxis() {
-  return view === "month" ? "y" : "x";
+  return "x";
 }
 
 function swipeTarget() {
@@ -576,7 +542,7 @@ function bindSwipes(area) {
   let wheelLock = 0;
   let wheelSum = 0;
   area.addEventListener("wheel", (event) => {
-    const axis = swipeAxis();
+    const axis = view === "month" ? "y" : "x";
     if (axis === "y") {
       const board = boardEl;
       if (board.scrollHeight > board.clientHeight + 2) return;
@@ -598,28 +564,15 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view calendar-view";
   root.innerHTML = `
-    <header class="view-head cal-head">
-      <h1>Календарь</h1>
-    </header>
-    <div class="cal-controls">
-      <div class="cal-views" data-views role="group" aria-label="Вид календаря"></div>
-      <div class="cal-modes">
-        <div class="filters" data-modes></div>
-        <button type="button" class="chip cal-sort" data-journal-toggle hidden></button>
+    <div class="cal-layout">
+      <div class="cal-block-head">
+        <button type="button" class="cal-title" data-zoom-title></button>
         <button type="button" class="chip cal-today" data-today hidden>Сегодня</button>
       </div>
-      <div class="cal-period">
-        <div class="cal-period-nav">
-          <button type="button" class="icon-btn cal-arrow" data-step="-1" aria-label="Предыдущий период">${icons.back}</button>
-          <button type="button" class="cal-title" data-zoom-title></button>
-          <button type="button" class="icon-btn cal-arrow is-next" data-step="1" aria-label="Следующий период">${icons.back}</button>
-        </div>
-      </div>
-    </div>
-    <div class="cal-layout">
       <div class="cal-board"></div>
       <section class="cal-panel" aria-label="Записи дня" hidden></section>
     </div>
+    <div class="cal-views" data-views role="group" aria-label="Вид календаря"></div>
     <button type="button" class="fab" data-new title="Новая запись на день (N)" aria-label="Новая запись на день">${icons.plus}</button>`;
   parent.append(root);
   boardEl = root.querySelector(".cal-board");
@@ -627,12 +580,6 @@ export function mount(parent) {
   attachSelection(panelEl, { item: ".cal-panel-card" });
   titleEl = root.querySelector(".cal-title");
 
-  root.querySelector("[data-modes]").addEventListener("click", (event) => {
-    const next = event.target.closest("[data-mode]")?.dataset.mode;
-    if (!next || next === mode) return;
-    mode = next;
-    render();
-  });
   root.querySelector("[data-views]").addEventListener("click", (event) => {
     const next = event.target.closest("[data-view-mode]")?.dataset.viewMode;
     if (!next || next === view) return;
@@ -643,10 +590,6 @@ export function mount(parent) {
     if (view === "day") cursor = startOfDay(parseDayKey(selectedDay) ?? Date.now());
     render();
   });
-  root.querySelector("[data-journal-toggle]").addEventListener("click", () => {
-    journalField = journalField === "createdAt" ? "updatedAt" : "createdAt";
-    render();
-  });
   root.querySelector("[data-today]").addEventListener("click", () => {
     cursor = startOfDay(Date.now());
     selectedDay = dayKey(cursor);
@@ -654,14 +597,9 @@ export function mount(parent) {
     hourFilter = null;
     render();
   });
-  root.querySelector(".cal-period-nav").addEventListener("click", (event) => {
-    const step = event.target.closest("[data-step]")?.dataset.step;
-    if (step) {
-      slideTo(Number(step));
-      return;
-    }
+  root.querySelector("[data-zoom-title]").addEventListener("click", () => {
     // Заголовок месяца: дни → месяцы → годы → снова дни.
-    if (event.target.closest("[data-zoom-title]") && view === "month") {
+    if (view === "month") {
       zoom = zoom === "days" ? "months" : zoom === "months" ? "years" : "days";
       render();
     }

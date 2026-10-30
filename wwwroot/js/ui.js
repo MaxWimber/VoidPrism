@@ -188,6 +188,7 @@ export function toast(message) {
 export const icons = {
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M10.3 3.5h3.4l.5 2.4a6.5 6.5 0 0 1 1.7 1l2.3-.8 1.7 2.9-1.8 1.6a6.6 6.6 0 0 1 0 2l1.8 1.6-1.7 2.9-2.3-.8a6.5 6.5 0 0 1-1.7 1l-.5 2.4h-3.4l-.5-2.4a6.5 6.5 0 0 1-1.7-1l-2.3.8-1.7-2.9 1.8-1.6a6.6 6.6 0 0 1 0-2L3.8 9l1.7-2.9 2.3.8a6.5 6.5 0 0 1 1.7-1z"/><circle cx="12" cy="12" r="2.6"/></svg>`,
   studio: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke-linecap="round"/></svg>`,
+  save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`,
   back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5 8 12l7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -197,7 +198,7 @@ export const icons = {
   fit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" stroke-linecap="round"/><circle cx="12" cy="12" r="2.4"/></svg>`,
   compose: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 19 9.5-9.5M14.5 9.5l1.6-1.6" stroke-linecap="round"/><path d="M17 3.5v3M15.5 5h3M19.5 10v2M18.5 11h2M10 3.5v2M9 4.5h2" stroke-linecap="round"/></svg>`,
   archive: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4.5h10a1 1 0 0 1 1 1V20l-6-3.2L6 20V5.5a1 1 0 0 1 1-1z"/></svg>`,
-  star: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="16" r="2"/><circle cx="17" cy="7" r="2.2"/><circle cx="18.5" cy="17" r="1.5"/><path d="M8.8 15 15.2 8.7M8.6 17.2l8.2-.1"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><ellipse cx="12" cy="12" rx="9.6" ry="4.2" transform="rotate(-24 12 12)"/><circle cx="19.6" cy="8.6" r="1.6" fill="currentColor" stroke="none"/></svg>`,
   board: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="4" width="7" height="6" rx="1.5"/><rect x="13.5" y="14" width="7" height="6" rx="1.5"/><path d="M10.5 7h2a3 3 0 0 1 3 3v4"/></svg>`,
   pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3.5 14.2 8l5 .7-3.6 3.5.9 5L12 14.8 7.5 17.2l.9-5L4.8 8.7 9.8 8 12 3.5z"/></svg>`,
   select: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4.5 6 18l3.6-3.2 2.3 5 2.2-.9-2.3-5.1H17L6 4.5z"/></svg>`,
@@ -212,6 +213,6 @@ export const icons = {
   bullets: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="1.4" fill="currentColor"/><circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="6" cy="17" r="1.4" fill="currentColor"/><path d="M10 7h9M10 12h9M10 17h9"/></svg>`,
   numbers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 7h2M5 12h3M5 17h2"/><path d="M11 7h8M11 12h8M11 17h8"/></svg>`,
   checks: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="5" height="5" rx="1"/><path d="M5.5 7.5 6.7 8.7 8.3 6.6"/><path d="M12 7.5h7M4 14h16M4 18h12"/></svg>`,
-  wish: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3.8 13.6 9h5.4l-4.3 3.2 1.6 5.2L12 14.4 7.7 17.4l1.6-5.2L5 9h5.4L12 3.8z"/><path d="M18.8 4.5v3M17.3 6h3" stroke-linecap="round"/></svg>`,
+  wish: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8C12.7 8.6 15.4 11.3 21.2 12 15.4 12.7 12.7 15.4 12 21.2 11.3 15.4 8.6 12.7 2.8 12 8.6 11.3 11.3 8.6 12 2.8z"/></svg>`,
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/><path d="M8 14h2M12 14h2M16 14h.01M8 17.5h2M12 17.5h2"/></svg>`,
 };

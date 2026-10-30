@@ -93,7 +93,7 @@ button { cursor: pointer; }
   z-index: 1;
   height: 100dvh;
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 1fr);
 }
 
 .nav {
@@ -139,18 +139,13 @@ button { cursor: pointer; }
   gap: 6px;
   border: 0;
   border-radius: 16px;
-  padding: 10px 4px;
+  padding: 12px 4px;
   background: transparent;
   color: var(--muted);
+  cursor: pointer;
 }
 
-.nav-btn svg { width: 22px; height: 22px; }
-
-.nav-btn span {
-  font-size: 11px;
-  letter-spacing: 0.01em;
-  text-align: center;
-}
+.nav-btn svg { width: 26px; height: 26px; }
 
 .nav-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
 
@@ -1310,14 +1305,6 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   min-height: 0;
 }
 
-/* Управление календарём: вид · что показывать · период. На широком экране — в строку. */
-.cal-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-}
-
 /* Сегментный переключатель: вид календаря, тип и статус записи. */
 .cal-views,
 .seg {
@@ -1357,69 +1344,25 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.35);
 }
 
-.cal-modes {
+/* Заголовок периода — внутри блока календаря: по центру, «Сегодня» справа. */
+.cal-block-head {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.cal-modes::-webkit-scrollbar { display: none; }
-
-.cal-modes .filters {
-  flex-wrap: nowrap;
-}
-
-.cal-modes .chip {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.cal-sort {
-  color: var(--cyan);
-}
-
-.cal-sort[hidden] { display: none; }
-
-/* Период: стрелки и заголовок по центру, «Сегодня» справа. */
-.cal-period {
-  display: flex;
   justify-content: center;
-  align-items: center;
-  flex: 1 1 360px;
-  margin-left: auto;
-  min-width: 0;
+  min-height: 44px;
+  /* Поля по бокам — под «Сегодня», чтобы длинный заголовок дня не наезжал на чип. */
+  padding: 6px 88px 0;
 }
 
-.cal-period [hidden] { display: none; }
-
-.cal-period-nav {
-  display: flex;
-  max-width: 100%;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-}
-
-/* «Сегодня» — в конце строки «План · Журнал · События», чтобы не теснить заголовок. */
-.cal-today {
-  margin-left: auto;
+.cal-block-head .cal-today {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-35%);
 }
 
 .cal-today[hidden] { display: none; }
-
-.cal-arrow {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-}
-
-.cal-arrow.is-next svg {
-  transform: rotate(180deg);
-}
 
 .cal-title {
   min-width: 0;
@@ -1457,7 +1400,7 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
    touch-action действует только до ближайшего прокручиваемого предка, а сетка недели,
    колонки дней и список дня сами прокручиваемые, — поэтому правило на всех вложенных. */
 .calendar-view.is-month .cal-layout,
-.calendar-view.is-month .cal-layout * { touch-action: pan-x; }
+.calendar-view.is-month .cal-layout *,
 .calendar-view.is-week .cal-layout,
 .calendar-view.is-week .cal-layout *,
 .calendar-view.is-day .cal-layout,
@@ -1469,14 +1412,23 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
 
 .calendar-view .cal-panel { padding-bottom: 88px; }
 
-/* «Плюсик» только в «Дне»: в месяце и неделе тап по дню открывает день. */
+/* «Плюсик» только в «Дне»: в месяце и неделе тап по дню открывает день.
+   Внизу переключатель вида — плюсик стоит над ним. */
 .calendar-view:not(.is-day) .fab { display: none; }
+.calendar-view .fab { bottom: 70px; }
+
+/* Месяц · Неделя · День — под календарём, чтобы не тянуться вверх. */
+.calendar-view .cal-views {
+  flex: none;
+  align-self: center;
+}
 
 .cal-layout {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -2798,4 +2750,13 @@ body.is-selecting .fab { display: none; }
 .switch-row[aria-checked="true"] .switch::after {
   transform: translateX(18px);
   background: var(--cyan);
+}
+
+/* Неделя: строка с датами остаётся сверху, пока часы прокручиваются. */
+.cal-week-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: rgb(10, 12, 26);
+  box-shadow: 0 -12px 0 rgb(10, 12, 26);
 }

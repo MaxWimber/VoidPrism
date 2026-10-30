@@ -107,9 +107,6 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view wishlist-view";
   root.innerHTML = `
-    <header class="view-head">
-      <h1>Желания</h1>
-    </header>
     <div class="toolbar">
       <div class="filters chip-row"></div>
     </div>

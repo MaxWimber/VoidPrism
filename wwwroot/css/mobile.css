@@ -58,10 +58,10 @@ body.is-mobile-app {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 56px;
+  gap: 0;
+  min-height: 50px;
   min-width: 0;
-  padding: 6px 1px 4px;
+  padding: 6px 1px;
   border-radius: 12px;
   font-size: 9px;
   letter-spacing: 0;
@@ -75,19 +75,9 @@ body.is-mobile-app {
 }
 
 .nav-bottom .nav-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 25px;
+  height: 25px;
   flex: 0 0 auto;
-}
-
-.nav-bottom .nav-btn span {
-  display: block !important;
-  font-size: 9px;
-  line-height: 1.15;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .stage {
@@ -176,21 +166,13 @@ h1 {
   white-space: nowrap;
 }
 
-/* Календарь на телефоне: вид во всю ширину, под ним фильтры, ниже период. */
-.cal-controls {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.cal-views {
+/* Календарь на телефоне: переключатель вида внизу во всю ширину. */
+.calendar-view .cal-views {
   width: 100%;
 }
 
-.cal-period {
-  flex: none;
-  margin-left: 0;
-  min-height: 34px;
+.calendar-view .fab {
+  bottom: 62px;
 }
 
 .cal-title {
@@ -200,7 +182,7 @@ h1 {
 .cal-layout {
   display: grid !important;
   grid-template-columns: 1fr !important;
-  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
   gap: 0 !important;
   flex: 1;
   min-height: 0;
@@ -345,7 +327,7 @@ h1 {
 .constellation-layout {
   position: relative;
   grid-template-columns: 1fr !important;
-  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
   gap: 0 !important;
   flex: 1;
   min-height: 0;

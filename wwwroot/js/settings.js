@@ -101,9 +101,6 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view settings-view";
   root.innerHTML = `
-    <header class="view-head">
-      <h1>Настройки</h1>
-    </header>
     <div class="seg settings-tabs" role="group" aria-label="Разделы настроек">
       ${TABS.map(([id, label]) => `<button type="button" data-settings-tab="${id}">${label}</button>`).join("")}
     </div>

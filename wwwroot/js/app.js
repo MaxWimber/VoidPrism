@@ -57,13 +57,13 @@ function desktopShell() {
         <span class="brand-mark"></span>
         <small>Void</small>
       </a>
-      <button type="button" class="nav-btn" data-view="constellation">${icons.star}<span>Созвездие</span></button>
-      <button type="button" class="nav-btn" data-view="archive">${icons.archive}<span>Архив</span></button>
-      <button type="button" class="nav-btn" data-view="calendar">${icons.calendar}<span>Календарь</span></button>
-      <button type="button" class="nav-btn" data-view="wishlist">${icons.wish}<span>Желания</span></button>
-      <button type="button" class="nav-btn" data-view="studio">${icons.studio}<span>Студия</span></button>
+      <button type="button" class="nav-btn" data-view="constellation" aria-label="Созвездие" title="Созвездие">${icons.star}</button>
+      <button type="button" class="nav-btn" data-view="archive" aria-label="Архив" title="Архив">${icons.archive}</button>
+      <button type="button" class="nav-btn" data-view="calendar" aria-label="Календарь" title="Календарь">${icons.calendar}</button>
+      <button type="button" class="nav-btn" data-view="wishlist" aria-label="Желания" title="Желания">${icons.wish}</button>
+      <button type="button" class="nav-btn" data-view="studio" aria-label="Студия" title="Студия">${icons.studio}</button>
       <div class="nav-spacer"></div>
-      <button type="button" class="nav-btn" data-view="settings">${icons.gear}<span>Настройки</span></button>
+      <button type="button" class="nav-btn" data-view="settings" aria-label="Настройки" title="Настройки">${icons.gear}</button>
     </nav>
     <main class="stage"></main>`;
 }
@@ -72,12 +72,12 @@ function mobileShell() {
   app.innerHTML = `
     <main class="stage"></main>
     <nav class="nav nav-bottom" aria-label="Разделы">
-      <button type="button" class="nav-btn" data-view="constellation">${icons.star}<span>Звёзды</span></button>
-      <button type="button" class="nav-btn" data-view="archive">${icons.archive}<span>Архив</span></button>
-      <button type="button" class="nav-btn" data-view="calendar">${icons.calendar}<span>Дни</span></button>
-      <button type="button" class="nav-btn" data-view="wishlist">${icons.wish}<span>Желания</span></button>
-      <button type="button" class="nav-btn" data-view="studio">${icons.studio}<span>Студия</span></button>
-      <button type="button" class="nav-btn" data-view="settings">${icons.gear}<span>Настройки</span></button>
+      <button type="button" class="nav-btn" data-view="constellation" aria-label="Звёзды" title="Звёзды">${icons.star}</button>
+      <button type="button" class="nav-btn" data-view="archive" aria-label="Архив" title="Архив">${icons.archive}</button>
+      <button type="button" class="nav-btn" data-view="calendar" aria-label="Дни" title="Дни">${icons.calendar}</button>
+      <button type="button" class="nav-btn" data-view="wishlist" aria-label="Желания" title="Желания">${icons.wish}</button>
+      <button type="button" class="nav-btn" data-view="studio" aria-label="Студия" title="Студия">${icons.studio}</button>
+      <button type="button" class="nav-btn" data-view="settings" aria-label="Настройки" title="Настройки">${icons.gear}</button>
     </nav>`;
 }
 

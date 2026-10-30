@@ -1,29 +1,26 @@
 package space.voidprism.app
 
 import android.content.Context
-import android.os.Build
-import android.view.HapticFeedbackConstants
-import android.view.View
 import android.webkit.JavascriptInterface
 
-class AndroidBridge(private val context: Context, private val view: View) {
+class AndroidBridge(private val context: Context) {
+    private val feedback = Feedback(context)
+
     @JavascriptInterface
     fun saveVault(json: String?) {
         if (json.isNullOrBlank()) return
         VaultStore.save(context.applicationContext, json)
     }
 
-    /** Системный тактильный отклик: тот же, что у штатных часов, клавиатуры и долгого нажатия. */
+    /** Короткая вибрация на действие: tick, check, save, done, hold, remove… */
     @JavascriptInterface
     fun haptic(kind: String?) {
-        val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-        val constant = when (kind) {
-            "tick" -> HapticFeedbackConstants.CLOCK_TICK
-            "hold" -> HapticFeedbackConstants.LONG_PRESS
-            "remove" -> if (modern) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
-            "check", "save", "done" -> if (modern) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
-            else -> HapticFeedbackConstants.KEYBOARD_TAP
-        }
-        view.post { view.performHapticFeedback(constant) }
+        feedback.vibrate(kind ?: return)
+    }
+
+    /** Тихий звук действия — системным потоком, а не мультимедиа. */
+    @JavascriptInterface
+    fun sound(kind: String?) {
+        feedback.sound(kind ?: return)
     }
 }

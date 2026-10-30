@@ -100,7 +100,7 @@ class MainActivity : AppCompatActivity() {
             textZoom = 100
         }
 
-        webView.addJavascriptInterface(AndroidBridge(this, webView), "VoidPrismAndroid")
+        webView.addJavascriptInterface(AndroidBridge(this), "VoidPrismAndroid")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(

@@ -189,7 +189,8 @@ body.is-keyboard .editor-progress,
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 52px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -901,3 +902,23 @@ body:not(.is-mobile-app) .text-dock-panel {
   color: #071018;
   background: #7ee7ff;
 }
+
+/* «Сохранить» — всегда в правом углу панели, какие бы инструменты ни были открыты. */
+.text-dock .dock-save {
+  order: 2;
+  margin-left: 6px;
+  color: #071018;
+  background: linear-gradient(160deg, var(--cyan), var(--violet));
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-self: center;
+}
+
+.text-dock .dock-save svg {
+  width: 20px;
+  height: 20px;
+}
+
+.text-dock .dock-save:active { transform: scale(0.94); }
