@@ -924,10 +924,11 @@ h1 {
   box-shadow: inset 0 0 0 1px rgba(186, 204, 255, 0.08);
 }
 
+/* «Вписать» и «Собрать» — в левом нижнем углу, напротив плюсика. */
 .sky-tools {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  bottom: 14px;
+  left: 14px;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -2721,13 +2722,26 @@ body.is-selecting .fab { display: none; }
   background: var(--cyan);
 }
 
-/* Неделя: строка с датами остаётся сверху, пока часы прокручиваются. */
-.cal-week-head {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: rgb(10, 12, 26);
-  box-shadow: 0 -12px 0 rgb(10, 12, 26);
+/* Неделя без подложки: блок прозрачный, как заголовок над ним. Прокручиваются только
+   часы — строка с датами и «весь день» стоят на месте, заливка под ними не нужна. */
+.calendar-view.is-week .cal-layout {
+  background: transparent;
+}
+
+.calendar-view.is-week .cal-board {
+  overflow-y: hidden;
+}
+
+.cal-week {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.cal-week-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* Неделя без заливки: дни и часы — только линии сетки, выбранный день — рамкой. */
@@ -2745,7 +2759,8 @@ body.is-selecting .fab { display: none; }
   border-color: color-mix(in srgb, var(--cyan) 30%, var(--line));
 }
 
-/* Нижняя панель вкладок — одна на все разделы: Дни, Архив, Желания, Студия, Настройки. */
+/* Нижняя панель вкладок — одна на все разделы: Дни, Архив, Желания, Студия, Настройки.
+   Без заливки, «жидкое стекло»: размытие того, что под ней, и светлый блик по краю. */
 .tab-bar {
   display: grid;
   grid-auto-flow: column;
@@ -2755,8 +2770,14 @@ body.is-selecting .fab { display: none; }
   width: min(100%, 560px);
   padding: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
 
 .settings-tabs,
@@ -2782,8 +2803,11 @@ body.is-selecting .fab { display: none; }
 
 .tab-bar button.is-on {
   color: var(--ink);
-  background: rgba(126, 231, 255, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Плюсик стоит над панелью вкладок. */

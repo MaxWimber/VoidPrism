@@ -333,9 +333,10 @@ h1 {
 
 .sky-tools {
   position: absolute;
-  top: 8px !important;
-  right: 8px !important;
-  left: auto !important;
+  top: auto !important;
+  bottom: 8px !important;
+  left: 8px !important;
+  right: auto !important;
   width: auto !important;
   max-width: none;
   flex-wrap: wrap;

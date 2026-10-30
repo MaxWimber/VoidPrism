@@ -1441,6 +1441,11 @@ function bindWhenSwipes(block) {
   const grid = block.querySelector(".when-grid");
   let swipe = null;
   let swallowClick = false;
+  // Флаг гасит только клик, который браузер шлёт сразу после жеста. После касания пальцем
+  // такого клика нет — флаг не должен дожить до следующего нажатия (иначе съест тап по заголовку).
+  document.addEventListener("pointerdown", () => {
+    swallowClick = false;
+  }, true);
   // Мышью тоже можно перетащить — на сайте стрелок больше нет.
   grid.addEventListener("pointerdown", (event) => {
     if (event.button > 0) return;
@@ -1469,9 +1474,6 @@ function bindWhenSwipes(block) {
     if (!current.axis) return;
     const delta = event.type === "pointerup" ? event.clientX - current.x : current.last;
     swallowClick = true;
-    setTimeout(() => {
-      swallowClick = false;
-    }, 300);
     if (Math.abs(delta) < 48) {
       grid.style.transition = "transform 0.18s ease";
       grid.style.transform = "";

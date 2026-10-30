@@ -368,6 +368,8 @@ export function render() {
   root.classList.toggle("is-month", view === "month");
   root.classList.toggle("is-week", view === "week");
   paintChrome();
+  // В «Неделе» прокручиваются только часы — помним, где были, чтобы перерисовка не сбросила.
+  const hoursScroll = boardEl.querySelector(".cal-week-body")?.scrollTop ?? 0;
   const map = byDay(visibleEntries());
   // В «Месяце» и «Неделе» только сетка, в «Дне» — только список записей дня.
   boardEl.hidden = view === "day";
@@ -378,7 +380,8 @@ export function render() {
   if (view === "day") paintPanel(map);
   else panelEl.innerHTML = "";
   // Неделя теперь на все 24 часа — при открытии прокручиваем к утру, а не к полуночи.
-  if (view === "week" && lastView !== "week") boardEl.scrollTop = 7 * HOUR_PX;
+  const hoursEl = boardEl.querySelector(".cal-week-body");
+  if (hoursEl) hoursEl.scrollTop = lastView === "week" ? hoursScroll : 7 * HOUR_PX;
   lastView = view;
 }
 
@@ -477,6 +480,10 @@ function slideTo(step) {
 function bindSwipes(area) {
   let swipe = null;
   let swallowClick = false;
+  // Флаг гасит только клик сразу после жеста; любое новое касание его сбрасывает.
+  document.addEventListener("pointerdown", () => {
+    swallowClick = false;
+  }, true);
   area.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse") return;
     // Строка чипов (фильтр по часам) прокручивается вбок сама — её жест не листает период.
@@ -515,9 +522,6 @@ function bindSwipes(area) {
       ? (current.axis === "x" ? event.clientX - current.x : event.clientY - current.y)
       : (current.last || 0);
     swallowClick = true;
-    setTimeout(() => {
-      swallowClick = false;
-    }, 300);
     if (Math.abs(delta) >= SWIPE_COMMIT) {
       // Палец влево/вверх — следующий период, вправо/вниз — предыдущий.
       slideTo(delta < 0 ? 1 : -1);
