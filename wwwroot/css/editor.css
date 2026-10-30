@@ -556,13 +556,6 @@ body:not(.is-mobile-app) .text-dock-panel {
   font-size: 15px;
 }
 
-.settings-extra {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
 /* --- Блок чеклиста: в тексте заметки и на карточках --- */
 
 .checklist {

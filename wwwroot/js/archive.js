@@ -1034,14 +1034,15 @@ function paintDrawer() {
   const body = drawerEl.querySelector(".body-input");
   const chips = drawerEl.querySelector(".chips");
   const statusRow = drawerEl.querySelector(".status-row");
-  const pin = drawerEl.querySelector("[data-pin-input]");
+  const pin = drawerEl.querySelector("[data-pin-toggle]");
   title.value = draft.title;
   resetChecklistState();
   writeBody(body, draft.body);
   drawerEl.querySelectorAll(".field-error").forEach((el) => {
     el.textContent = "";
   });
-  pin.checked = draft.pinned;
+  pin.classList.toggle("is-on", Boolean(draft.pinned));
+  pin.setAttribute("aria-pressed", String(Boolean(draft.pinned)));
   const showStatus = draft.kind === "task" || draft.kind === "wish";
   statusRow.hidden = !showStatus;
   const priorityRow = drawerEl.querySelector(".priority-row");
@@ -1561,8 +1562,12 @@ function bindDrawer() {
       if (error) error.textContent = "Не удалось добавить изображение.";
     }
   });
-  drawerEl.querySelector("[data-pin-input]").addEventListener("change", (event) => {
-    draft.pinned = event.target.checked;
+  drawerEl.querySelector("[data-pin-toggle]").addEventListener("click", (event) => {
+    event.stopPropagation();
+    draft.pinned = !draft.pinned;
+    const pin = event.currentTarget;
+    pin.classList.toggle("is-on", draft.pinned);
+    pin.setAttribute("aria-pressed", String(draft.pinned));
   });
   bindWhenPicker();
   const tagInput = drawerEl.querySelector(".tag-input");
@@ -1636,9 +1641,7 @@ export function mount(parent) {
           <div class="editor-top-side">
             <button type="button" class="date-clear" data-clear-date hidden aria-label="Убрать дату">×</button>
             <button type="button" class="date-plain" data-pick-date>Дата</button>
-            <button type="button" class="icon-btn" data-settings aria-label="Настройки записи">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V21M4.8 6.8l1.6 1.6M17.6 15.6l1.6 1.6M3.5 12h2.2M18.3 12H21M4.8 17.2l1.6-1.6M17.6 8.4l1.6-1.6"/></svg>
-            </button>
+            <button type="button" class="icon-btn" data-settings aria-label="Настройки записи">${icons.settings}</button>
           </div>
         </div>
         <section class="text-card">
@@ -1723,40 +1726,38 @@ export function mount(parent) {
         <div class="editor-progress" aria-live="polite"></div>
       </div>
       <div class="editor-settings">
-        <button type="button" class="date-plain sheet-back" data-settings-back>Назад</button>
+        <div class="settings-head">
+          <button type="button" class="date-plain sheet-back" data-settings-back>Назад</button>
+          <div class="settings-tools">
+            <button type="button" class="icon-tool" data-pin-toggle aria-pressed="false" title="Закрепить в архиве" aria-label="Закрепить в архиве">${icons.pin}</button>
+            <button type="button" class="icon-tool" data-constellation title="В созвездие" aria-label="В созвездие">${icons.orbit}</button>
+            <button type="button" class="icon-tool is-danger" data-delete title="Удалить запись" aria-label="Удалить запись">${icons.trash}</button>
+          </div>
+        </div>
         <p class="field-error"></p>
-        <p class="hint">Тип</p>
-        <div class="segmented">
-          <button type="button" class="chip" data-kind="note">Заметка</button>
-          <button type="button" class="chip" data-kind="task">Задача</button>
-          <button type="button" class="chip" data-kind="event">Событие</button>
-          <button type="button" class="chip" data-kind="wish">Желание</button>
+        <div class="seg seg-4" role="group" aria-label="Тип записи">
+          <button type="button" data-kind="note">Заметка</button>
+          <button type="button" data-kind="task">Задача</button>
+          <button type="button" data-kind="event">Событие</button>
+          <button type="button" data-kind="wish">Желание</button>
         </div>
         <div class="status-row">
-          <p class="hint">Активность</p>
-          <div class="segmented" aria-label="Статус">
-            <button type="button" class="chip" data-status-set="open">Открыта</button>
-            <button type="button" class="chip" data-status-set="focus">В фокусе</button>
-            <button type="button" class="chip" data-status-set="done">Готово</button>
+          <div class="seg" role="group" aria-label="Статус">
+            <button type="button" data-status-set="open">Открыта</button>
+            <button type="button" data-status-set="focus">В фокусе</button>
+            <button type="button" data-status-set="done">Готово</button>
           </div>
         </div>
         <div class="priority-row" hidden>
-          <p class="hint">Сила желания</p>
-          <div class="segmented" aria-label="Сила желания">
-            <button type="button" class="chip" data-priority="1">Тихо</button>
-            <button type="button" class="chip" data-priority="2">Живо</button>
-            <button type="button" class="chip" data-priority="3">Сильно</button>
+          <div class="seg" role="group" aria-label="Сила желания">
+            <button type="button" data-priority="1">Тихо</button>
+            <button type="button" data-priority="2">Живо</button>
+            <button type="button" data-priority="3">Сильно</button>
           </div>
         </div>
-        <p class="hint">Метки — это орбиты</p>
         <div class="tag-editor">
           <div class="chips"></div>
-          <input class="tag-input" type="text" maxlength="32" placeholder="метка и Enter" aria-label="Новая метка" />
-        </div>
-        <label class="check"><input type="checkbox" data-pin-input /> Закрепить в архиве</label>
-        <div class="settings-extra">
-          <button type="button" class="btn ghost" data-constellation>В созвездие</button>
-          <button type="button" class="btn danger" data-delete>Удалить</button>
+          <input class="tag-input" type="text" maxlength="32" placeholder="Метка и Enter" aria-label="Новая метка" />
         </div>
       </div>
       <div class="when-sheet" hidden>
