@@ -2759,8 +2759,7 @@ body.is-selecting .fab { display: none; }
   border-color: color-mix(in srgb, var(--cyan) 30%, var(--line));
 }
 
-/* Нижняя панель вкладок — одна на все разделы: Дни, Архив, Желания, Студия, Настройки.
-   Без заливки, «жидкое стекло»: размытие того, что под ней, и светлый блик по краю. */
+/* Нижняя панель вкладок — одна на все разделы: Дни, Архив, Желания, Студия, Настройки. */
 .tab-bar {
   display: grid;
   grid-auto-flow: column;
@@ -2770,14 +2769,8 @@ body.is-selecting .fab { display: none; }
   width: min(100%, 560px);
   padding: 3px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .settings-tabs,
@@ -2803,13 +2796,38 @@ body.is-selecting .fab { display: none; }
 
 .tab-bar button.is-on {
   color: var(--ink);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.2);
+  background: rgba(126, 231, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.35);
 }
 
 /* Плюсик стоит над панелью вкладок. */
 .archive-view .fab,
 .wishlist-view .fab { bottom: 70px; }
+
+/* В Архиве, Желаниях и Настройках панель висит поверх списка: записи прокручиваются
+   под ней до самого низа, без полосы-подложки, где список обрезался над панелью. */
+.archive-view .tab-bar,
+.wishlist-view .tab-bar,
+.settings-view .tab-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 4;
+  width: min(calc(100% - 24px), 560px);
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.settings-view .tab-bar { width: min(calc(100% - 24px), 360px); }
+
+.settings-view { position: relative; }
+
+.archive-view.is-on,
+.wishlist-view.is-on,
+.settings-view.is-on { padding-bottom: 0; }
+
+.archive-view .cards-scroll,
+.wishlist-view .wish-scroll { padding-bottom: 140px; }
+
+.settings-scroll { padding-bottom: 76px; }

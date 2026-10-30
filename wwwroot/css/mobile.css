@@ -659,3 +659,16 @@ h1 {
 .wishlist-view .fab {
   bottom: 62px;
 }
+
+/* Панель поверх списка: вид без нижнего поля, панель — у самого низа. */
+body .archive-view.is-on,
+body .wishlist-view.is-on,
+body .settings-view.is-on {
+  padding-bottom: 0 !important;
+}
+
+.archive-view .tab-bar,
+.wishlist-view .tab-bar,
+.settings-view .tab-bar {
+  bottom: 10px;
+}
