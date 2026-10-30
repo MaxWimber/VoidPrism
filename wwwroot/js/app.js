@@ -231,56 +231,28 @@ function saveProfileFromForm() {
   });
 }
 
+// Редактор записи — слой поверх текущего экрана: открывается там, где вы сейчас,
+// и после закрытия вы остаётесь там же. Так «назад» проходит путь в обратном порядке.
 bridge.openEntry = (id) => {
-  const entry = getState().entries.find((item) => item.id === id);
-  if (entry?.kind === "wish") {
-    show("wishlist");
-    archive.openEditor(id);
-    return;
-  }
-  if (current === "calendar") {
-    archive.openEditor(id);
-    return;
-  }
-  show("archive");
   archive.openEditor(id);
 };
 
 bridge.openWish = (id) => {
-  show("wishlist");
   archive.openEditor(id);
 };
 
 bridge.newWish = () => {
-  show("wishlist");
   archive.openEditor(null, { kind: "wish", tags: ["желания"] });
 };
 
-bridge.afterWishSave = () => {
-  show("wishlist");
-};
-
 bridge.newEntry = (preset) => {
-  if (preset?.kind === "wish") {
-    show("wishlist");
-    archive.openEditor(null, preset);
-    return;
-  }
-  if (current === "calendar" || Number.isFinite(preset?.when) || preset?.kind === "event") {
-    if (current !== "calendar" && (Number.isFinite(preset?.when) || preset?.kind === "event")) {
-      show("calendar");
-    }
-    archive.openEditor(null, preset);
-    return;
-  }
-  show("archive");
   archive.openEditor(null, preset);
 };
 
 bridge.afterCalendarSave = (id) => {
+  if (current !== "calendar") return;
   const entry = getState().entries.find((item) => item.id === id);
   if (Number.isFinite(entry?.when)) calendar.focusDay(entry.when);
-  show("calendar");
 };
 
 bridge.filterTag = (name) => {
@@ -369,13 +341,9 @@ function handleBack() {
     return true;
   }
   if (current === "calendar" && calendar.handleBack()) return true;
-  if (current === "constellation" && constellation.isSheetOpen()) {
-    constellation.closeSheet();
-    return true;
-  }
+  if (current === "constellation" && constellation.handleBack()) return true;
   const previous = visited.pop();
   if (previous) {
-    if (previous === "constellation") constellation.closeSheet();
     show(previous, { fromBack: true });
     return true;
   }

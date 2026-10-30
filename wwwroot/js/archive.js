@@ -230,6 +230,11 @@ function syncDraftFields() {
 function finishEditor() {
   if (editingList) stopChecklistEdit();
   syncDraftFields();
+  // Открыли и закрыли без правок — ничего не пишем, дата изменения остаётся прежней.
+  if (!isDirty() && getState().entries.some((entry) => entry.id === draft.id)) {
+    closeDrawer();
+    return;
+  }
   if (!draft.title.trim()) {
     const body = bodyEl();
     if (!hasContent(body)) {
@@ -1110,11 +1115,7 @@ function saveDraft() {
     return state;
   });
   closeDrawer();
-  if (saved.kind === "wish") {
-    bridge.afterWishSave?.(saved.id);
-    return;
-  }
-  if (Number.isFinite(saved.when) || saved.kind === "event") {
+  if (Number.isFinite(saved.when)) {
     bridge.afterCalendarSave?.(saved.id);
   }
   requestAnimationFrame(() => {

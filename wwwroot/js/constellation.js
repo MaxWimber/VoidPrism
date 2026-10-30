@@ -19,6 +19,8 @@ let active = false;
 /** @type {null | { type: 'core' } | { type: 'theme', name: string } | { type: 'entry', id: string }} */
 let selected = null;
 let sheet = false;
+// Путь по шторке: «Карта личности» → орбита → запись → … «Назад» идёт по нему обратно.
+let trail = [];
 let lastSize = "";
 let drag = null;
 let pan = null;
@@ -1125,6 +1127,7 @@ export function mount(parent) {
       } else if (!spaceDown) {
         selected = null;
         sheet = false;
+        trail = [];
         render();
       } else {
         drawSky();
@@ -1136,6 +1139,7 @@ export function mount(parent) {
     drag = null;
     sky.classList.remove("is-dragging");
     const rect = sky.getBoundingClientRect();
+    trail = [];
     if (finished.moved) {
       const pos = clampPos(finished.x, finished.y, rect.width, rect.height);
       sheet = false;
@@ -1182,6 +1186,7 @@ export function mount(parent) {
     if (spaceDown) return;
     if (event.target.closest("[data-theme]") || event.target.closest("[data-entry]")) return;
     if (event.target.closest("[data-action='core']")) {
+      trail = [];
       selected = { type: "core" };
       sheet = true;
       render();
@@ -1191,23 +1196,17 @@ export function mount(parent) {
 
   dossier.addEventListener("click", (event) => {
     if (event.target.closest("[data-back]")) {
-      selected = null;
-      sheet = false;
-      render();
+      stepBack();
       return;
     }
     const pick = event.target.closest("[data-pick]")?.dataset.pick;
     if (pick) {
-      selected = { type: "theme", name: pick };
-      sheet = true;
-      render();
+      goTo({ type: "theme", name: pick });
       return;
     }
     const selectEntry = event.target.closest("[data-select-entry]")?.dataset.selectEntry;
     if (selectEntry) {
-      selected = { type: "entry", id: selectEntry };
-      sheet = true;
-      render();
+      goTo({ type: "entry", id: selectEntry });
       return;
     }
     const open = event.target.closest("[data-open]")?.dataset.open;
@@ -1247,19 +1246,44 @@ export function setActive(on) {
   }
 }
 
+/** Переход внутри шторки: текущий экран запоминается, «Назад» к нему вернёт. */
+function goTo(next) {
+  if (selected && (sheet || !isMobileApp())) trail.push(selected);
+  selected = next;
+  sheet = true;
+  render();
+}
+
+/** Шаг назад по шторке: к прошлому экрану, а с первого — закрыть её (на сайте — к «Карте личности»). */
+function stepBack() {
+  const previous = trail.pop();
+  selected = previous || null;
+  sheet = Boolean(previous);
+  render();
+}
+
 export function isSheetOpen() {
   return Boolean(root?.classList.contains("is-sheet"));
+}
+
+/** Системный «назад» в приложении: шаг по шторке, если она открыта. */
+export function handleBack() {
+  if (!isSheetOpen()) return false;
+  stepBack();
+  return true;
 }
 
 export function closeSheet() {
   selected = null;
   sheet = false;
+  trail = [];
   if (active) render();
 }
 
 export function focusTheme(name) {
   selected = name ? { type: "theme", name } : null;
   sheet = Boolean(name);
+  trail = [];
   if (active) render();
 }
 
