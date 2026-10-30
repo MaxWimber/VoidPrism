@@ -1165,6 +1165,8 @@ function paintDateLabel() {
   if (block) block.hidden = !hasDate();
   const clear = drawerEl.querySelector("[data-clear-date]");
   if (clear) clear.hidden = !Number.isFinite(draft.when);
+  // Скрытое колесо не прокрутить — выставляем его, как только блок даты показан.
+  if (hasDate()) paintWheels();
 }
 
 /** Календарь и часы по черновику. Без даты — текущий месяц и час, день не отмечен. */
@@ -1184,6 +1186,7 @@ function initWhen() {
 function openSettings(focus) {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   drawerEl.querySelector(".drawer")?.classList.add("is-settings");
+  paintWheels();
   if (focus === "date") drawerEl.querySelector(".when-block")?.scrollIntoView({ block: "start" });
 }
 
@@ -1218,46 +1221,103 @@ function hourAngle() {
   return (whenPick.hour % 12) * 30 + whenPick.minute * 0.5;
 }
 
-function clockText() {
-  return `${String(whenPick.hour).padStart(2, "0")}:${String(whenPick.minute).padStart(2, "0")}`;
-}
-
 function paintClock() {
   drawerEl.querySelector(".clock-hand.hour").style.transform = `rotate(${hourAngle()}deg)`;
   drawerEl.querySelector(".clock-hand.minute").style.transform = `rotate(${whenPick.minute * 6}deg)`;
-  const readout = drawerEl.querySelector(".when-clock-readout");
-  if (document.activeElement !== readout) readout.value = clockText();
+  paintWheels();
 }
 
-/** «1930», «19:30», «930», «9» → часы и минуты; null, если ввод не похож на время. */
-function parseClockInput(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (!digits) return null;
-  let hour;
-  let minute = 0;
-  if (digits.length <= 2) hour = Number(digits);
-  else if (digits.length === 3) {
-    hour = Number(digits.slice(0, 1));
-    minute = Number(digits.slice(1));
-  } else {
-    hour = Number(digits.slice(0, 2));
-    minute = Number(digits.slice(2, 4));
-  }
-  if (hour > 23 || minute > 59) return null;
-  return { hour, minute };
+// --- Колёса часов и минут ---
+// Прокрутка с привязкой к значению; тап по соседнему значению докручивает к нему,
+// тап по выбранному открывает поле ввода с клавиатуры. Колёса и стрелки синхронны.
+
+const WHEEL_ITEM = 32;
+
+function wheelValue(kind) {
+  return kind === "hour" ? whenPick.hour : whenPick.minute;
 }
 
-function commitClockInput() {
-  const readout = drawerEl.querySelector(".when-clock-readout");
-  if (!whenPick || !readout) return;
-  const parsed = parseClockInput(readout.value);
-  if (parsed) {
-    whenPick.hour = parsed.hour;
-    whenPick.minute = parsed.minute;
-  }
-  readout.value = clockText();
+/** Ставит колёса на текущее время. Сама эта прокрутка не считается выбором пользователя. */
+function paintWheels() {
+  if (!whenPick) return;
+  drawerEl.querySelectorAll("[data-wheel]").forEach((wheel) => {
+    const value = wheelValue(wheel.dataset.wheel);
+    wheel.querySelectorAll(".wheel-item").forEach((item) => {
+      item.classList.toggle("is-on", Number(item.dataset.value) === value);
+    });
+    if (wheel.clientHeight === 0) return;
+    const top = value * WHEEL_ITEM;
+    if (Math.abs(wheel.scrollTop - top) < 1) return;
+    wheel.quietUntil = performance.now() + 250;
+    wheel.scrollTop = top;
+  });
+}
+
+function setWheelValue(kind, value) {
+  if (!whenPick) return;
+  const max = kind === "hour" ? 23 : 59;
+  const next = Math.min(max, Math.max(0, Math.round(value)));
+  if (wheelValue(kind) === next && whenPick.day != null) return;
+  if (kind === "hour") whenPick.hour = next;
+  else whenPick.minute = next;
   paintClock();
   commitWhen();
+}
+
+function openWheelInput(box) {
+  const wheel = box.querySelector("[data-wheel]");
+  const input = box.querySelector(".wheel-input");
+  input.hidden = false;
+  input.value = String(wheelValue(wheel.dataset.wheel)).padStart(2, "0");
+  input.focus();
+  input.select();
+}
+
+function closeWheelInput(input) {
+  if (input.hidden) return;
+  const kind = input.closest(".wheel-box").querySelector("[data-wheel]").dataset.wheel;
+  input.hidden = true;
+  const digits = input.value.replace(/\D/g, "");
+  if (digits) setWheelValue(kind, Number(digits));
+  else paintWheels();
+}
+
+function bindWheels(block) {
+  block.querySelectorAll(".wheel-box").forEach((box) => {
+    const wheel = box.querySelector("[data-wheel]");
+    const input = box.querySelector(".wheel-input");
+    let settle = 0;
+    // Выбором считается только прокрутка видимого колеса пользователем: когда настройки
+    // скрываются, браузер сам сбрасывает прокрутку в 0 — это не «00».
+    const userScroll = () => wheel.clientHeight > 0 && performance.now() >= (wheel.quietUntil || 0);
+    wheel.addEventListener("scroll", () => {
+      clearTimeout(settle);
+      if (!userScroll()) return;
+      settle = setTimeout(() => {
+        if (!userScroll()) return;
+        setWheelValue(wheel.dataset.wheel, wheel.scrollTop / WHEEL_ITEM);
+      }, 120);
+    });
+    wheel.addEventListener("click", (event) => {
+      const item = event.target.closest(".wheel-item");
+      if (!item) return;
+      const value = Number(item.dataset.value);
+      if (value === wheelValue(wheel.dataset.wheel)) openWheelInput(box);
+      else wheel.scrollTo({ top: value * WHEEL_ITEM, behavior: "smooth" });
+    });
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/\D/g, "").slice(0, 2);
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === "Escape") input.value = "";
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", () => closeWheelInput(input));
+  });
 }
 
 function paintWhenPicker() {
@@ -1385,19 +1445,7 @@ function bindWhenPicker() {
   };
   face.addEventListener("pointerup", releaseHand);
   face.addEventListener("pointercancel", releaseHand);
-  const readout = block.querySelector(".when-clock-readout");
-  readout.addEventListener("focus", () => readout.select());
-  readout.addEventListener("input", () => {
-    const digits = readout.value.replace(/\D/g, "").slice(0, 4);
-    readout.value = digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
-  });
-  readout.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      readout.blur();
-    }
-  });
-  readout.addEventListener("blur", commitClockInput);
+  bindWheels(block);
 }
 
 function bindDrawer() {
@@ -1789,7 +1837,21 @@ export function mount(parent) {
           <div class="when-week">${["пн","вт","ср","чт","пт","сб","вс"].map((day) => `<span>${day}</span>`).join("")}</div>
           <div class="when-grid"></div>
           <div class="when-clock">
-            <input class="when-clock-readout" type="text" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Время, часы и минуты" value="00:00" />
+            <div class="time-wheels">
+              <div class="wheel-box">
+                <div class="wheel" data-wheel="hour" aria-label="Часы">
+                  ${Array.from({ length: 24 }, (_, value) => `<button type="button" class="wheel-item" data-value="${value}">${String(value).padStart(2, "0")}</button>`).join("")}
+                </div>
+                <input class="wheel-input" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Часы" hidden />
+              </div>
+              <span class="wheel-colon">:</span>
+              <div class="wheel-box">
+                <div class="wheel" data-wheel="minute" aria-label="Минуты">
+                  ${Array.from({ length: 60 }, (_, value) => `<button type="button" class="wheel-item" data-value="${value}">${String(value).padStart(2, "0")}</button>`).join("")}
+                </div>
+                <input class="wheel-input" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Минуты" hidden />
+              </div>
+            </div>
             <div class="clock-face" data-clock>
               ${Array.from({ length: 60 }, (_, index) => `<span class="clock-tick${index % 5 ? "" : " is-hour"}" style="transform: rotate(${index * 6}deg)"><i></i></span>`).join("")}
               <div class="clock-hand hour"></div>

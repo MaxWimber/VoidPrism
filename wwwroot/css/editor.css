@@ -374,6 +374,125 @@ body:not(.is-mobile-app) .text-dock-panel {
   margin-top: 8px;
 }
 
+/* Компактнее, чем отдельная шторка: ниже ячейки, циферблат меньше и сбоку от колёс. */
+.when-block .when-month span {
+  font-size: 15px;
+}
+
+.when-block .when-grid {
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.when-block .when-cell {
+  height: 28px;
+  font-size: 13px;
+}
+
+.when-block .when-clock {
+  --clock: min(168px, 44vw);
+  flex-direction: row-reverse;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.when-block .clock-face {
+  margin-top: 0;
+}
+
+/* Колёса часов и минут: прокрутка с привязкой, выбранное значение — в рамке по центру. */
+.time-wheels {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wheel-box {
+  position: relative;
+  width: 52px;
+  height: 96px;
+}
+
+.wheel-box::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(126, 231, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.3);
+  pointer-events: none;
+}
+
+.wheel {
+  position: relative;
+  height: 96px;
+  padding: 32px 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent);
+  mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent);
+}
+
+.wheel::-webkit-scrollbar {
+  display: none;
+}
+
+.wheel-item {
+  display: block;
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 32px;
+  scroll-snap-align: center;
+  cursor: pointer;
+}
+
+.wheel-item.is-on {
+  color: var(--ink);
+}
+
+.wheel-input {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 32px;
+  z-index: 2;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #151a33;
+  box-shadow: inset 0 0 0 1px var(--cyan);
+  color: var(--cyan);
+  font-family: var(--display);
+  font-size: 20px;
+  text-align: center;
+  outline: none;
+}
+
+.wheel-input[hidden] {
+  display: none;
+}
+
+.wheel-colon {
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 22px;
+}
+
 .when-clear[hidden] {
   display: none;
 }
