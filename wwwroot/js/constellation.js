@@ -7,7 +7,7 @@ import { esc, formatDate, icons, toneColor, toneFor, toast } from "./ui.js";
 
 const MAX_THEMES = 22;
 const MAX_ZOOM = 4.2;
-const MIN_ZOOM = 0.25;
+const MIN_ZOOM = 0.12;
 
 let root;
 let sky;
@@ -77,13 +77,6 @@ function centerOf(width, height) {
   return { cx: width / 2, cy: height / 2 + 6 };
 }
 
-function ringSize(width, height) {
-  return {
-    rx: Math.max(120, Math.min(width * 0.3, 340)),
-    ry: Math.max(90, Math.min(height * 0.3, 230)),
-  };
-}
-
 function scaleOf(width, height) {
   return Math.min(width, height);
 }
@@ -131,25 +124,246 @@ function shownThemes() {
   return { themes, pairs, shown };
 }
 
+// --- Раскладка «орбитальная система» ---
+// Центр — «Я». Каждая орбита-метка — планета со своими лунами-записями. Размер системы
+// считается вместе с подписями, системы ставятся кольцами вокруг центра так, чтобы их
+// круги не пересекались. Раскладка в мировых координатах и не зависит от рамки блока:
+// камера потом просто вписывает всё в экран.
+
+const CORE_REACH = 92;
+const SYSTEM_GAP = 22;
+const MOON_GAP = 6;
+
+function themeRadius(theme) {
+  return Math.min(46, 24 + Math.sqrt(theme.count) * 9);
+}
+
+function themeFont(count) {
+  return count > 14 ? 11 : 13;
+}
+
+/** Примерная ширина подписи: шрифт интерфейса ~0.62em на символ. */
+function labelWidth(text, max, font) {
+  return Math.min(String(text).length, max) * font * 0.62;
+}
+
+/** Круг, который занимает луна вместе с подписью под ней. */
+function moonReach(entry) {
+  const radius = entryRadius(entry);
+  return Math.max(radius + 20, labelWidth(entry.title, 14, 10) / 2 + 4);
+}
+
+/** Не задевает ли круг (x, y, r) прямоугольник подписи планеты. */
+function clearOfLabel(x, y, r, box) {
+  const dx = Math.max(box.left - x, 0, x - box.right);
+  const dy = Math.max(box.top - y, 0, y - box.bottom);
+  return Math.hypot(dx, dy) >= r;
+}
+
+/**
+ * Луны вокруг планеты: кольцо с проёмом снизу под подпись планеты. Кольцо растёт,
+ * пока все луны не встанут без касаний. Здесь считается только размер системы
+ * и свободная дуга; сами углы лун — в moonOffsets, когда известно, где «наружу».
+ */
+function planetSystem(theme, moons, font) {
+  const radius = themeRadius(theme);
+  const label = labelWidth(theme.name, 18, font);
+  const box = { left: -label / 2 - 4, right: label / 2 + 4, top: radius + 4, bottom: radius + 24 };
+  const labelReach = Math.hypot(label / 2 + 4, radius + 24);
+  const empty = { radius, moons: [], steps: [], dist: 0, gap: 0, reach: Math.max(radius + 8, labelReach) };
+  if (!moons.length) return empty;
+
+  const reaches = moons.map(moonReach);
+  const maxReach = Math.max(...reaches);
+  const step = (x, y, dist) => 2 * Math.asin(Math.min(1, (x + y + MOON_GAP) / (2 * dist)));
+  let dist = radius + maxReach + 10;
+  for (let guard = 0; guard < 200; guard += 1) {
+    // Половина проёма снизу: крайние луны по обе стороны не должны задеть подпись.
+    let gap = 0;
+    while (gap < Math.PI && !clearOfLabel(Math.sin(gap) * dist, Math.cos(gap) * dist, maxReach, box)) gap += 0.04;
+    // И крайние луны по разные стороны проёма не должны касаться друг друга.
+    gap = Math.max(gap, Math.asin(Math.min(1, (maxReach + MOON_GAP / 2) / dist)));
+    const steps = reaches.slice(1).map((reach, index) => step(reaches[index], reach, dist));
+    if (steps.reduce((sum, value) => sum + value, 0) <= Math.PI * 2 - gap * 2) {
+      return { radius, moons: moons.map((moon) => moon.id), steps, dist, gap, reach: Math.max(dist + maxReach, labelReach) };
+    }
+    dist += 8;
+  }
+  return empty;
+}
+
+/**
+ * Углы лун: блок лун разворачивается «наружу» — от центра созвездия, чтобы луны
+ * не висели на линиях к «Я». Проём снизу под подпись планеты не занимается.
+ * Углы экранные (y вниз): π/2 — низ.
+ */
+function moonOffsets(system, outward) {
+  if (!system.moons.length) return [];
+  const start = Math.PI / 2 + system.gap;
+  const free = Math.PI * 2 - system.gap * 2;
+  const need = system.steps.reduce((sum, value) => sum + value, 0);
+  const count = system.moons.length;
+  // Немного воздуха между лунами, но не растягиваем их по всей окружности.
+  const air = count > 1 ? Math.min((free - need) / (count - 1), 0.35) : 0;
+  const block = need + air * (count - 1);
+  let center = start + ((((outward - start) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+  if (center > start + free) center = center - (start + free) < start + Math.PI * 2 - center ? start + free : start;
+  let angle = Math.min(Math.max(center - block / 2, start), start + free - block);
+  return system.moons.map((id, index) => {
+    if (index > 0) angle += system.steps[index - 1] + air;
+    return { id, dx: Math.cos(angle) * system.dist, dy: Math.sin(angle) * system.dist };
+  });
+}
+
+/** Порядок по кольцу: следующей ставим самую связанную с предыдущей орбиту. */
+function chainOrder(themes, pairs) {
+  const weight = (a, b) => pairs.get([a, b].sort((x, y) => x.localeCompare(y, "ru")).join("\u0000")) || 0;
+  const left = [...themes];
+  const order = left.length ? [left.shift()] : [];
+  while (left.length) {
+    const last = order[order.length - 1].name;
+    let best = 0;
+    for (let i = 1; i < left.length; i += 1) {
+      if (weight(last, left[i].name) > weight(last, left[best].name)) best = i;
+    }
+    order.push(left.splice(best, 1)[0]);
+  }
+  return order;
+}
+
+/** Сколько радиан кольца радиуса dist занимают системы, стоящие вплотную. */
+function ringAngle(list, dist) {
+  if (list.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const a = list[i].reach;
+    const b = list[(i + 1) % list.length].reach;
+    const sin = (a + b + SYSTEM_GAP) / (2 * dist);
+    if (sin >= 1) return Infinity;
+    total += 2 * Math.asin(sin);
+  }
+  return total;
+}
+
+/** Системы по кольцам вокруг центра. Возвращает центры систем и радиусы колец. */
+function placeSystems(systems) {
+  const rings = [];
+  const centers = new Map();
+  let inner = CORE_REACH;
+  let rest = systems;
+  while (rest.length) {
+    const maxReach = Math.max(...rest.map((item) => item.reach));
+    const base = inner + maxReach + SYSTEM_GAP;
+    let dist = base;
+    while (ringAngle(rest, dist) > Math.PI * 2 && dist < base * 1.5) dist += 8;
+    let members = rest;
+    if (ringAngle(rest, dist) > Math.PI * 2) {
+      // Всем не поместиться без сильного раздувания — берём, сколько влезает, остальное наружу.
+      dist = base;
+      let count = 1;
+      while (count < rest.length && ringAngle(rest.slice(0, count + 1), dist) <= Math.PI * 2) count += 1;
+      members = rest.slice(0, count);
+      dist = inner + Math.max(...members.map((item) => item.reach)) + SYSTEM_GAP;
+      while (ringAngle(members, dist) > Math.PI * 2) dist += 8;
+    }
+    const spare = (Math.PI * 2 - ringAngle(members, dist)) / Math.max(members.length, 1);
+    let angle = -Math.PI / 2 + (rings.length % 2 ? Math.PI / Math.max(members.length, 1) : 0);
+    members.forEach((item, index) => {
+      if (index > 0) {
+        const prev = members[index - 1];
+        angle += 2 * Math.asin(Math.min(1, (prev.reach + item.reach + SYSTEM_GAP) / (2 * dist))) + spare;
+      }
+      centers.set(item.name, { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, angle });
+    });
+    rings.push(dist);
+    inner = dist + Math.max(...members.map((item) => item.reach));
+    rest = rest.slice(members.length);
+  }
+  return { centers, rings, outer: inner };
+}
+
+let layoutCache = null;
+
+/** Полная раскладка по умолчанию: планеты, луны, кольца. Зависит только от данных. */
+function orbitalLayout(themes) {
+  // Перерисовка идёт на каждом кадре перетаскивания — пересчитываем, только когда изменились данные.
+  const state = getState();
+  const key = themes.map((theme) => `${theme.name}:${theme.count}`).join("|");
+  if (layoutCache?.state === state && layoutCache.key === key) return layoutCache.result;
+  const result = computeOrbitalLayout(themes);
+  layoutCache = { state, key, result };
+  return result;
+}
+
+function computeOrbitalLayout(themes) {
+  const { pairs } = themesOf(getState().entries);
+  const font = themeFont(themes.length);
+  const entries = visibleEntries();
+  const groups = new Map(themes.map((theme) => [theme.name, []]));
+  const orphans = [];
+  for (const entry of entries) {
+    const group = groups.get(primaryTag(entry));
+    if (group) group.push(entry);
+    else orphans.push(entry);
+  }
+  const systems = chainOrder(themes, pairs).map((theme) => ({
+    name: theme.name,
+    ...planetSystem(theme, groups.get(theme.name), font),
+  }));
+  const { centers, rings, outer } = placeSystems(systems);
+  const moons = new Map();
+  for (const system of systems) {
+    const outward = centers.get(system.name)?.angle ?? -Math.PI / 2;
+    for (const offset of moonOffsets(system, outward)) {
+      moons.set(offset.id, { theme: system.name, dx: offset.dx, dy: offset.dy });
+    }
+  }
+  // Записи с метками, которых нет на небе, — внешним кольцом вокруг всего.
+  if (orphans.length) {
+    const reach = Math.max(...orphans.map(moonReach));
+    const dist = Math.max(outer + reach + SYSTEM_GAP, (orphans.length * (reach * 2 + MOON_GAP)) / (Math.PI * 2));
+    orphans.forEach((entry, index) => {
+      const angle = -Math.PI / 2 + (index / orphans.length) * Math.PI * 2;
+      moons.set(entry.id, { theme: null, dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist });
+    });
+    rings.push(dist);
+  }
+  return { centers, moons, rings };
+}
+
 function defaultThemes(themes, width, height) {
   const { cx, cy } = centerOf(width, height);
-  const { rx, ry } = ringSize(width, height);
-  return themes.map((theme, index) => {
-    const angle = -Math.PI / 2 + (index / Math.max(themes.length, 1)) * Math.PI * 2;
-    const radius = Math.min(46, 24 + Math.sqrt(theme.count) * 9);
-    const pos = clampPos(
-      cx + Math.cos(angle) * rx,
-      cy + Math.sin(angle) * ry * 0.92,
-      width,
-      height,
-    );
-    return { ...theme, angle, radius, x: pos.x, y: pos.y };
+  const { centers } = orbitalLayout(themes);
+  return themes.map((theme) => {
+    const at = centers.get(theme.name) || { x: 0, y: 0, angle: 0 };
+    return { ...theme, angle: at.angle, radius: themeRadius(theme), x: cx + at.x, y: cy + at.y };
+  });
+}
+
+/** Луны держатся своей планеты: смещение считается от того места, где планета стоит сейчас. */
+function defaultEntries(entries, themePlaced, width, height) {
+  const { cx, cy } = centerOf(width, height);
+  const { moons } = orbitalLayout(themePlaced);
+  const themeByName = new Map(themePlaced.map((theme) => [theme.name, theme]));
+  return entries.map((entry) => {
+    const moon = moons.get(entry.id);
+    const planet = moon?.theme ? themeByName.get(moon.theme) : null;
+    const x = (planet ? planet.x : cx) + (moon?.dx ?? 0);
+    const y = (planet ? planet.y : cy) + (moon?.dy ?? 0);
+    const pos = clampPos(x, y, width, height);
+    return {
+      ...entry,
+      radius: entryRadius(entry),
+      x: pos.x,
+      y: pos.y,
+      angle: Math.atan2(pos.y - cy, pos.x - cx),
+      homeTag: primaryTag(entry),
+    };
   });
 }
 
 function layoutThemes(themes, width, height, { saved = orbitMap(), overrides = null, targets = null, t = 1 } = {}) {
   const { cx, cy } = centerOf(width, height);
-  const { rx, ry } = ringSize(width, height);
   const scale = scaleOf(width, height);
   const defaults = defaultThemes(themes, width, height);
   const placed = defaults.map((theme) => {
@@ -178,53 +392,7 @@ function layoutThemes(themes, width, height, { saved = orbitMap(), overrides = n
       angle: Math.atan2(pos.y - cy, pos.x - cx),
     };
   });
-  return { cx, cy, rx, ry, placed };
-}
-
-function defaultEntries(entries, themePlaced, width, height) {
-  const { cx, cy } = centerOf(width, height);
-  const { rx, ry } = ringSize(width, height);
-  const byTheme = new Map();
-  for (const entry of entries) {
-    const tag = primaryTag(entry);
-    if (!byTheme.has(tag)) byTheme.set(tag, []);
-    byTheme.get(tag).push(entry);
-  }
-  const themeByName = new Map(themePlaced.map((theme) => [theme.name, theme]));
-  const placed = [];
-
-  for (const [tag, group] of byTheme) {
-    const theme = themeByName.get(tag);
-    group.forEach((entry, index) => {
-      const radius = entryRadius(entry);
-      let x;
-      let y;
-      let angle;
-      if (theme) {
-        const spread = Math.min(1.1, 0.22 * Math.max(group.length - 1, 1));
-        angle = theme.angle + (index - (group.length - 1) / 2) * (spread / Math.max(group.length - 1, 1) || 0);
-        if (group.length === 1) angle = theme.angle;
-        else angle = theme.angle + (index - (group.length - 1) / 2) * Math.min(0.35, 1.4 / group.length);
-        const dist = theme.radius + 52 + Math.min(group.length, 8) * 2;
-        x = theme.x + Math.cos(angle) * dist;
-        y = theme.y + Math.sin(angle) * dist * 0.92;
-      } else {
-        angle = -Math.PI / 2 + (placed.length / Math.max(entries.length, 1)) * Math.PI * 2;
-        x = cx + Math.cos(angle) * rx * 1.55;
-        y = cy + Math.sin(angle) * ry * 1.4;
-      }
-      const pos = clampPos(x, y, width, height);
-      placed.push({
-        ...entry,
-        radius,
-        x: pos.x,
-        y: pos.y,
-        angle: Math.atan2(pos.y - cy, pos.x - cx),
-        homeTag: tag,
-      });
-    });
-  }
-  return placed;
+  return { cx, cy, placed, rings: orbitalLayout(themes).rings };
 }
 
 function layoutEntries(entries, themePlaced, width, height, { saved = entryMap(), overrides = null, targets = null, t = 1 } = {}) {
@@ -302,17 +470,21 @@ function fitCamera(geo, width, height, animate = false) {
   let minY = geo.cy - 90;
   let maxX = geo.cx + 90;
   let maxY = geo.cy + 90;
+  // В рамку попадают и подписи: они бывают шире самих кругов.
+  const font = themeFont(geo.placed.length);
   for (const theme of geo.placed) {
-    minX = Math.min(minX, theme.x - theme.radius - 28);
-    minY = Math.min(minY, theme.y - theme.radius - 28);
-    maxX = Math.max(maxX, theme.x + theme.radius + 28);
-    maxY = Math.max(maxY, theme.y + theme.radius + 36);
+    const half = Math.max(theme.radius + 12, labelWidth(theme.name, 18, font) / 2 + 8);
+    minX = Math.min(minX, theme.x - half);
+    minY = Math.min(minY, theme.y - theme.radius - 16);
+    maxX = Math.max(maxX, theme.x + half);
+    maxY = Math.max(maxY, theme.y + theme.radius + 30);
   }
   for (const entry of geo.entries || []) {
-    minX = Math.min(minX, entry.x - entry.radius - 20);
-    minY = Math.min(minY, entry.y - entry.radius - 20);
-    maxX = Math.max(maxX, entry.x + entry.radius + 20);
-    maxY = Math.max(maxY, entry.y + entry.radius + 28);
+    const half = Math.max(entry.radius + 10, labelWidth(entry.title, 14, 10) / 2 + 8);
+    minX = Math.min(minX, entry.x - half);
+    minY = Math.min(minY, entry.y - entry.radius - 12);
+    maxX = Math.max(maxX, entry.x + half);
+    maxY = Math.max(maxY, entry.y + entry.radius + 24);
   }
   const mobile = isMobileApp();
   const pad = mobile ? 18 : 48;
@@ -512,7 +684,7 @@ function drawSky(options = {}) {
   svg.innerHTML = `
     <rect class="sky-hit" width="${width}" height="${height}" fill="transparent"></rect>
     <g class="sky-world">
-      <ellipse class="guide" cx="${geo.cx}" cy="${geo.cy}" rx="${geo.rx}" ry="${geo.ry * 0.92}"></ellipse>
+      ${geo.rings.map((ring) => `<circle class="guide" cx="${geo.cx}" cy="${geo.cy}" r="${ring}"></circle>`).join("")}
       ${chords}
       ${themeSpokes}
       ${entryLinks}
