@@ -903,22 +903,18 @@ body:not(.is-mobile-app) .text-dock-panel {
   background: #7ee7ff;
 }
 
-/* «Сохранить» — всегда в правом углу панели, какие бы инструменты ни были открыты. */
+/* «Сохранить» — обычная команда панели, всегда в правом углу, какие бы инструменты ни были открыты. */
 .text-dock .dock-save {
   order: 2;
-  margin-left: 6px;
-  color: #071018;
-  background: linear-gradient(160deg, var(--cyan), var(--violet));
-  border-radius: 50%;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  align-self: center;
+  margin-left: 4px;
 }
 
-.text-dock .dock-save svg {
-  width: 20px;
-  height: 20px;
+/* Календарь даты без стрелок: заголовок по центру, сетка листается свайпом вбок. */
+.when-block .when-month {
+  justify-content: center;
 }
 
-.text-dock .dock-save:active { transform: scale(0.94); }
+.when-block .when-grid,
+.when-block .when-grid * {
+  touch-action: pan-y;
+}

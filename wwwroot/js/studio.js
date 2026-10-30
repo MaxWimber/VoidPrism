@@ -1,5 +1,5 @@
 /**
- * Раздел «Студия» — дополнительные инструменты: вкладки «Схемы» (полотно) и «Таблицы».
+ * Раздел «Студия» — дополнительные инструменты: вкладки «Схемы» (полотно) и «Таблицы» внизу.
  * Полотно схем — прежний модуль canvas.js, он просто живёт внутри студии.
  */
 import * as canvas from "./canvas.js";
@@ -28,10 +28,10 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view studio-view";
   root.innerHTML = `
-    <div class="seg studio-tabs" role="group" aria-label="Инструменты студии">
+    <div class="studio-body"></div>
+    <div class="tab-bar studio-tabs" role="group" aria-label="Инструменты студии">
       ${TABS.map(([id, label]) => `<button type="button" data-studio-tab="${id}">${label}</button>`).join("")}
-    </div>
-    <div class="studio-body"></div>`;
+    </div>`;
   parent.append(root);
   const body = root.querySelector(".studio-body");
   canvas.mount(body);

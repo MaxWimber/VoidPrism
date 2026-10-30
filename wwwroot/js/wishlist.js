@@ -75,22 +75,16 @@ function cardHtml(entry) {
     </article>`;
 }
 
-/** Чипы фильтров сразу показывают, сколько желаний в каждом срезе. */
-function paintFilters(items) {
-  const count = (id) => {
-    if (id === "all") return items.length;
-    if (id === "alive") return items.filter((item) => item.status !== "done").length;
-    return items.filter((item) => item.status === id).length;
-  };
+function paintFilters() {
   filterEl.innerHTML = FILTERS.map(([id, label]) => `
-    <button type="button" class="chip ${filter === id ? "is-on" : ""}" data-filter="${id}">${label}<small>${count(id)}</small></button>
+    <button type="button" class="${filter === id ? "is-on" : ""}" data-filter="${id}" aria-pressed="${filter === id}">${label}</button>
   `).join("");
 }
 
 export function render() {
   if (!root) return;
   const items = wishes();
-  paintFilters(items);
+  paintFilters();
   const shown = sorted(items);
   if (!shown.length) {
     listEl.innerHTML = `
@@ -107,13 +101,11 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view wishlist-view";
   root.innerHTML = `
-    <div class="toolbar">
-      <div class="filters chip-row"></div>
-    </div>
     <div class="wish-scroll"></div>
+    <div class="tab-bar wish-tabs" role="group" aria-label="Какие желания показать"></div>
     <button type="button" class="fab" data-new title="Новое желание (N)" aria-label="Новое желание">${icons.plus}</button>`;
   parent.append(root);
-  filterEl = root.querySelector(".filters");
+  filterEl = root.querySelector(".wish-tabs");
   listEl = root.querySelector(".wish-scroll");
   attachSelection(listEl, { item: ".wish-card" });
 

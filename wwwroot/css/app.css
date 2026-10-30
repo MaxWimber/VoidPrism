@@ -230,26 +230,6 @@ h1 {
   padding: 11px 16px;
 }
 
-.filters { display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* Архив: фильтры одной строкой с прокруткой, как ряд меток. */
-.archive-view .filters {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.archive-view .filters::-webkit-scrollbar { display: none; }
-
-.archive-view .filters .chip {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
 /* Ряд чипов: одна строка, лишнее прокручивается вбок. Счётчик — внутри чипа. */
 .chip-row {
   flex: 1 1 auto;
@@ -1305,8 +1285,7 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   min-height: 0;
 }
 
-/* Сегментный переключатель: вид календаря, тип и статус записи. */
-.cal-views,
+/* Сегментный переключатель: тип и статус записи. */
 .seg {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1316,13 +1295,10 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.cal-views { width: 300px; }
-
 .seg { width: 100%; }
 
 .seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-.cal-views button,
 .seg button {
   min-height: 32px;
   padding: 6px 0;
@@ -1337,7 +1313,6 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.cal-views button.is-on,
 .seg button.is-on {
   color: var(--ink);
   background: rgba(126, 231, 255, 0.16);
@@ -1416,12 +1391,6 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
    Внизу переключатель вида — плюсик стоит над ним. */
 .calendar-view:not(.is-day) .fab { display: none; }
 .calendar-view .fab { bottom: 70px; }
-
-/* Месяц · Неделя · День — под календарём, чтобы не тянуться вверх. */
-.calendar-view .cal-views {
-  flex: none;
-  align-self: center;
-}
 
 .cal-layout {
   flex: 1;
@@ -2581,15 +2550,15 @@ body.is-selecting .fab { display: none; }
   margin-bottom: 2px;
 }
 
-/* Настройки: вкладки «Настройки · Профиль», профиль — обычный раздел по концепту. */
+/* Настройки: содержимое прокручивается, вкладки «Настройки · Профиль» — внизу. */
 .settings-view.is-on {
-  overflow: auto;
+  overflow: hidden;
 }
 
-.settings-tabs,
-.studio-tabs {
-  max-width: 360px;
-  flex: none;
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .settings-pane {
@@ -2660,8 +2629,8 @@ body.is-selecting .fab { display: none; }
 .studio-view.is-on {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px 0;
+  gap: 10px;
+  padding: 16px 18px;
   min-height: 0;
 }
 
@@ -2760,3 +2729,63 @@ body.is-selecting .fab { display: none; }
   background: rgb(10, 12, 26);
   box-shadow: 0 -12px 0 rgb(10, 12, 26);
 }
+
+/* Неделя без заливки: дни и часы — только линии сетки, выбранный день — рамкой. */
+.cal-week .cal-week-day,
+.cal-week .cal-allday-col,
+.cal-week .cal-day-col,
+.cal-week .cal-hour-cell {
+  background: transparent;
+}
+
+.cal-week .cal-week-day.is-selected,
+.cal-week .cal-allday-col.is-selected,
+.cal-week .cal-day-col.is-selected {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--cyan) 30%, var(--line));
+}
+
+/* Нижняя панель вкладок — одна на все разделы: Дни, Архив, Желания, Студия, Настройки. */
+.tab-bar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  flex: none;
+  align-self: center;
+  width: min(100%, 560px);
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.settings-tabs,
+.studio-tabs { width: min(100%, 360px); }
+
+.tab-bar button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tab-bar button.is-on {
+  color: var(--ink);
+  background: rgba(126, 231, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.35);
+}
+
+/* Плюсик стоит над панелью вкладок. */
+.archive-view .fab,
+.wishlist-view .fab { bottom: 70px; }

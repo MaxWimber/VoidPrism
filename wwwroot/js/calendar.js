@@ -572,7 +572,7 @@ export function mount(parent) {
       <div class="cal-board"></div>
       <section class="cal-panel" aria-label="Записи дня" hidden></section>
     </div>
-    <div class="cal-views" data-views role="group" aria-label="Вид календаря"></div>
+    <div class="tab-bar cal-views" data-views role="group" aria-label="Вид календаря"></div>
     <button type="button" class="fab" data-new title="Новая запись на день (N)" aria-label="Новая запись на день">${icons.plus}</button>`;
   parent.append(root);
   boardEl = root.querySelector(".cal-board");

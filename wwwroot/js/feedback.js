@@ -81,12 +81,38 @@ const SOUNDS = {
   },
   hold: (ctx) => tone(ctx, { freq: 520, dur: 0.06, gain: 0.04, glide: 1.3 }),
   remove: (ctx) => tone(ctx, { freq: 300, dur: 0.16, gain: 0.07, glide: 0.55 }),
+  // Все галочки блока закрыты — короткое восходящее арпеджио.
+  complete: (ctx) => {
+    [784, 988, 1175, 1568].forEach((freq, i) => tone(ctx, { freq, at: i * 0.055, dur: i === 3 ? 0.24 : 0.09, gain: 0.04 }));
+  },
+  // «Собрать»: звёзды слетаются — подъём тона и мягкий звон в конце.
+  gather: (ctx) => {
+    tone(ctx, { freq: 330, dur: 0.22, gain: 0.04, glide: 2.2 });
+    tone(ctx, { freq: 1047, at: 0.18, dur: 0.22, gain: 0.035 });
+    tone(ctx, { freq: 1568, at: 0.22, dur: 0.26, gain: 0.025 });
+  },
+  // «Вписать»: камера отъезжает — два мягких тона вниз.
+  fit: (ctx) => {
+    tone(ctx, { freq: 880, dur: 0.1, gain: 0.035, glide: 0.85 });
+    tone(ctx, { freq: 660, at: 0.08, dur: 0.16, gain: 0.035, glide: 0.9 });
+  },
 };
 
 // --- вибрация ---
 
 // На Android — вибромотор через приложение (WebView сам navigator.vibrate не поддерживает), иначе Vibration API.
-const VIBRATE_MS = { tick: 4, check: 10, uncheck: 6, save: 12, done: [10, 40, 14], hold: 18, remove: [14, 30, 20] };
+const VIBRATE_MS = {
+  tick: 4,
+  check: 10,
+  uncheck: 6,
+  save: 12,
+  done: [10, 40, 14],
+  hold: 18,
+  remove: [14, 30, 20],
+  complete: [10, 40, 10, 40, 16],
+  gather: 14,
+  fit: 8,
+};
 
 function vibrate(kind) {
   const android = window.VoidPrismAndroid;
@@ -101,7 +127,7 @@ function vibrate(kind) {
 const MIN_GAP = { tick: 28 };
 const last = {};
 
-/** Отклик на действие: tick | check | uncheck | save | done | hold | remove. */
+/** Отклик на действие: tick | check | uncheck | save | done | hold | remove | complete | gather | fit. */
 export function feedback(kind) {
   const now = performance.now();
   if (now - (last[kind] || 0) < (MIN_GAP[kind] || 60)) return;

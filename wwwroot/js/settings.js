@@ -101,9 +101,7 @@ export function mount(parent) {
   root = document.createElement("section");
   root.className = "view settings-view";
   root.innerHTML = `
-    <div class="seg settings-tabs" role="group" aria-label="Разделы настроек">
-      ${TABS.map(([id, label]) => `<button type="button" data-settings-tab="${id}">${label}</button>`).join("")}
-    </div>
+    <div class="settings-scroll">
     <div class="settings-pane" data-pane="settings">
       <div class="settings-group">
         ${SWITCHES.map(([key, label, hint]) => `
@@ -125,6 +123,10 @@ export function mount(parent) {
       <input class="text-input" data-profile="epithet" maxlength="80" placeholder="Подпись" aria-label="Подпись" />
       <div class="chip-row profile-chips"></div>
       <button type="button" class="btn danger slim profile-clear" data-clear>Очистить космос</button>
+    </div>
+    </div>
+    <div class="tab-bar settings-tabs" role="group" aria-label="Разделы настроек">
+      ${TABS.map(([id, label]) => `<button type="button" data-settings-tab="${id}">${label}</button>`).join("")}
     </div>`;
   parent.append(root);
 

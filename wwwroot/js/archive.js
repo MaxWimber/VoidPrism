@@ -24,7 +24,6 @@ import {
   formatDate,
   icons,
   toneColor,
-  toast,
   toneFor,
   uid,
 } from "./ui.js";
@@ -131,8 +130,10 @@ function renderWelcome() {
 }
 
 function renderFilters() {
-  for (const button of filterEl.querySelectorAll(".chip")) {
-    button.classList.toggle("is-on", button.dataset.filter === kindFilter);
+  for (const button of filterEl.querySelectorAll("[data-filter]")) {
+    const on = button.dataset.filter === kindFilter;
+    button.classList.toggle("is-on", on);
+    button.setAttribute("aria-pressed", String(on));
   }
 }
 
@@ -228,21 +229,18 @@ function syncDraftFields() {
 }
 
 /** Выход из редактора с сохранением: стрелка «назад» в шапке и системный жест «назад». */
-/** Сохраняет запись. stay — кнопка «Сохранить»: запись остаётся открытой. */
-function finishEditor({ stay = false } = {}) {
+function finishEditor() {
   if (editingList) stopChecklistEdit();
   syncDraftFields();
   // Открыли и закрыли без правок — ничего не пишем, дата изменения остаётся прежней.
   if (!isDirty() && getState().entries.some((entry) => entry.id === draft.id)) {
-    if (stay) toast("Уже сохранено");
-    else closeDrawer();
+    closeDrawer();
     return;
   }
   if (!draft.title.trim()) {
     const body = bodyEl();
     if (!hasContent(body)) {
-      if (stay) toast("Пустую запись не сохранить");
-      else closeDrawer();
+      closeDrawer();
       return;
     }
     // Без названия запись не теряем: берём первую строку текста.
@@ -250,7 +248,7 @@ function finishEditor({ stay = false } = {}) {
     draft.title = (first || "Без названия").slice(0, 60);
     drawerEl.querySelector(".title-input").value = draft.title;
   }
-  saveDraft({ stay });
+  saveDraft();
 }
 
 async function requestClose() {
@@ -777,8 +775,14 @@ function onRowKey(event) {
   return false;
 }
 
+function checkSound(row, done) {
+  if (!done) return "uncheck";
+  const rows = row.closest(".checklist")?.querySelectorAll(".check-row") || [];
+  return [...rows].every((item) => item.classList.contains("is-done")) ? "complete" : "check";
+}
+
 function toggleRow(row) {
-  feedback(row.classList.toggle("is-done") ? "check" : "uncheck");
+  feedback(checkSound(row, row.classList.toggle("is-done")));
   commitBody();
 }
 
@@ -1088,7 +1092,7 @@ export function openEditor(id, preset = {}) {
   paintDrawer();
 }
 
-function saveDraft({ stay = false } = {}) {
+function saveDraft() {
   syncDraftFields();
   const title = draft.title.trim();
   drawerEl.querySelector(".drawer")?.classList.remove("is-settings");
@@ -1123,14 +1127,6 @@ function saveDraft({ stay = false } = {}) {
     return state;
   });
   feedback("save");
-  if (stay) {
-    // Остаёмся в записи: всё, что сейчас на экране, считается сохранённым.
-    draft.title = title;
-    draft.updatedAt = saved.updatedAt;
-    snapshot = JSON.stringify(draft);
-    toast("Сохранено");
-    return;
-  }
   closeDrawer();
   if (Number.isFinite(saved.when)) {
     bridge.afterCalendarSave?.(saved.id);
@@ -1429,9 +1425,83 @@ function shortDelta(next, prev, span) {
   return delta;
 }
 
+/** Листает то, что сейчас видно в календаре даты: месяц, год или двенадцать лет. */
+function shiftWhen(step) {
+  if (!whenPick) return;
+  const date = new Date(whenPick.cursor);
+  if (whenPick.zoom === "years") date.setFullYear(date.getFullYear() + step * 12);
+  else if (whenPick.zoom === "months") date.setFullYear(date.getFullYear() + step);
+  else date.setMonth(date.getMonth() + step);
+  whenPick.cursor = date.getTime();
+  paintMonth();
+}
+
+// Календарь даты листается свайпом влево/вправо, как «Дни»: сетка едет за пальцем.
+function bindWhenSwipes(block) {
+  const grid = block.querySelector(".when-grid");
+  let swipe = null;
+  let swallowClick = false;
+  // Мышью тоже можно перетащить — на сайте стрелок больше нет.
+  grid.addEventListener("pointerdown", (event) => {
+    if (event.button > 0) return;
+    swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null, last: 0 };
+  });
+  grid.addEventListener("pointermove", (event) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    if (!swipe.axis) {
+      if (Math.hypot(dx, dy) < 10) return;
+      swipe.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (swipe.axis !== "x") {
+        swipe = null;
+        return;
+      }
+    }
+    swipe.last = dx;
+    grid.style.transition = "none";
+    grid.style.transform = `translateX(${dx * 0.6}px)`;
+  });
+  const finish = (event) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const current = swipe;
+    swipe = null;
+    if (!current.axis) return;
+    const delta = event.type === "pointerup" ? event.clientX - current.x : current.last;
+    swallowClick = true;
+    setTimeout(() => {
+      swallowClick = false;
+    }, 300);
+    if (Math.abs(delta) < 48) {
+      grid.style.transition = "transform 0.18s ease";
+      grid.style.transform = "";
+      return;
+    }
+    // Палец влево — следующий месяц, вправо — предыдущий; новый въезжает с другой стороны.
+    const step = delta < 0 ? 1 : -1;
+    shiftWhen(step);
+    grid.style.transition = "none";
+    grid.style.transform = `translateX(${step * 40}%)`;
+    grid.style.opacity = "0";
+    void grid.offsetWidth;
+    grid.style.transition = "transform 0.2s ease, opacity 0.2s ease";
+    grid.style.transform = "";
+    grid.style.opacity = "";
+  };
+  grid.addEventListener("pointerup", finish);
+  grid.addEventListener("pointercancel", finish);
+  grid.addEventListener("click", (event) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }, true);
+}
+
 function bindWhenPicker() {
   const block = drawerEl.querySelector(".when-block");
   const face = block.querySelector("[data-clock]");
+  bindWhenSwipes(block);
   drawerEl.querySelector("[data-pick-date]").addEventListener("click", (event) => {
     event.stopPropagation();
     openSettings("date");
@@ -1448,17 +1518,6 @@ function bindWhenPicker() {
     }
     if (event.target.closest("[data-month-title]")) {
       whenPick.zoom = whenPick.zoom === "days" ? "months" : whenPick.zoom === "months" ? "years" : "days";
-      paintMonth();
-      return;
-    }
-    const shift = event.target.closest("[data-month]")?.dataset.month;
-    if (shift) {
-      // Стрелки листают то, что сейчас видно: месяц, год или двенадцать лет.
-      const date = new Date(whenPick.cursor);
-      if (whenPick.zoom === "years") date.setFullYear(date.getFullYear() + Number(shift) * 12);
-      else if (whenPick.zoom === "months") date.setFullYear(date.getFullYear() + Number(shift));
-      else date.setMonth(date.getMonth() + Number(shift));
-      whenPick.cursor = date.getTime();
       paintMonth();
       return;
     }
@@ -1634,7 +1693,7 @@ function bindDrawer() {
       return;
     }
     if (event.target.closest("[data-done]")) finishEditor();
-    if (event.target.closest("[data-save]")) finishEditor({ stay: true });
+    if (event.target.closest("[data-save]")) finishEditor();
     if (event.target.closest("[data-cancel]")) requestClose();
     if (event.target.closest("[data-delete]")) deleteDraft();
     if (event.target.closest("[data-constellation]")) {
@@ -1769,20 +1828,20 @@ export function mount(parent) {
     </div>
     <div class="toolbar">
       <input class="search" type="search" placeholder="Искать по словам и меткам" aria-label="Поиск" />
-      <div class="filters"></div>
     </div>
     <div class="archive-layout">
       <aside class="tag-rail" aria-label="Метки"></aside>
       <div class="cards-scroll"><div class="cards"></div></div>
-    </div>`;
+    </div>
+    <div class="tab-bar archive-tabs" role="group" aria-label="Тип записей"></div>`;
   parent.append(root);
   welcomeEl = root.querySelector(".welcome");
   searchEl = root.querySelector(".search");
-  filterEl = root.querySelector(".filters");
+  filterEl = root.querySelector(".archive-tabs");
   railEl = root.querySelector(".tag-rail");
   cardsEl = root.querySelector(".cards");
   attachSelection(cardsEl, { item: ".card" });
-  filterEl.innerHTML = FILTERS.map(([id, label]) => `<button type="button" class="chip" data-filter="${id}">${label}</button>`).join("");
+  filterEl.innerHTML = FILTERS.map(([id, label]) => `<button type="button" data-filter="${id}">${label}</button>`).join("");
 
   drawerEl = document.createElement("div");
   drawerEl.className = "drawer-back";
@@ -1914,9 +1973,7 @@ export function mount(parent) {
         </div>
         <div class="when-block" hidden>
           <div class="when-month">
-            <button type="button" class="date-plain" data-month="-1" aria-label="Предыдущий месяц">‹</button>
             <button type="button" class="date-plain when-title" data-month-title aria-label="Выбрать месяц и год"></button>
-            <button type="button" class="date-plain" data-month="1" aria-label="Следующий месяц">›</button>
           </div>
           <div class="when-week">${["пн","вт","ср","чт","пт","сб","вс"].map((day) => `<span>${day}</span>`).join("")}</div>
           <div class="when-grid"></div>

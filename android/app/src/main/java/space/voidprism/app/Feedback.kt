@@ -64,7 +64,7 @@ class Feedback(context: Context) {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> when (kind) {
                 "tick" -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
                 "hold", "remove" -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
-                "done" -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)
+                "done", "complete" -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)
                 else -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
             }
             else -> VibrationEffect.createOneShot(
@@ -109,6 +109,18 @@ class Feedback(context: Context) {
             ),
             "hold" to listOf(Tone(520.0, dur = 0.06, gain = 0.28, glide = 1.3)),
             "remove" to listOf(Tone(300.0, dur = 0.16, gain = 0.42, glide = 0.55)),
+            "complete" to listOf(784.0, 988.0, 1175.0, 1568.0).mapIndexed { i, freq ->
+                Tone(freq, at = i * 0.055, dur = if (i == 3) 0.24 else 0.09, gain = 0.26)
+            },
+            "gather" to listOf(
+                Tone(330.0, dur = 0.22, gain = 0.28, glide = 2.2),
+                Tone(1047.0, at = 0.18, dur = 0.22, gain = 0.24),
+                Tone(1568.0, at = 0.22, dur = 0.26, gain = 0.18),
+            ),
+            "fit" to listOf(
+                Tone(880.0, dur = 0.1, gain = 0.26, glide = 0.85),
+                Tone(660.0, at = 0.08, dur = 0.16, gain = 0.26, glide = 0.9),
+            ),
         )
 
         fun synth(tones: List<Tone>): ShortArray {

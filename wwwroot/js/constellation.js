@@ -1002,10 +1002,12 @@ export function mount(parent) {
   root.querySelector(".sky-tools").addEventListener("click", (event) => {
     event.stopPropagation();
     if (event.target.closest("[data-compose]")) {
+      feedback("gather");
       compose();
       return;
     }
     if (event.target.closest("[data-fit]")) {
+      feedback("fit");
       fitView();
       return;
     }
@@ -1228,7 +1230,10 @@ export function mount(parent) {
       if (row || line != null) {
         const index = row ? [...body.querySelectorAll(".checklist .check-row")].indexOf(row) : -1;
         const wasDone = (row || event.target.closest("[data-check-line]")).classList.contains("is-done");
-        feedback(wasDone ? "uncheck" : "check");
+        // Последняя открытая галочка блока — звук «блок выполнен».
+        const others = row ? [...row.closest(".checklist").querySelectorAll(".check-row")].filter((item) => item !== row) : [];
+        const closesBlock = row && !wasDone && others.every((item) => item.classList.contains("is-done"));
+        feedback(wasDone ? "uncheck" : closesBlock ? "complete" : "check");
         update((state) => {
           const entry = state.entries.find((item) => item.id === body.dataset.body);
           if (!entry) return state;

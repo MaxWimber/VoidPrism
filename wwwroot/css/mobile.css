@@ -41,7 +41,7 @@ body.is-mobile-app {
   gap: 0;
   width: 100% !important;
   margin: 0 !important;
-  padding: 6px 2px calc(12px + var(--safe-bottom, 28px)) !important;
+  padding: 4px 2px calc(4px + var(--safe-bottom, 28px)) !important;
   border: 0 !important;
   border-top: 1px solid var(--line) !important;
   border-right: 0 !important;
@@ -166,11 +166,7 @@ h1 {
   white-space: nowrap;
 }
 
-/* Календарь на телефоне: переключатель вида внизу во всю ширину. */
-.calendar-view .cal-views {
-  width: 100%;
-}
-
+/* Календарь на телефоне: плюсик над панелью «Месяц · Неделя · День». */
 .calendar-view .fab {
   bottom: 62px;
 }
@@ -299,12 +295,6 @@ h1 {
   white-space: nowrap;
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .welcome {
   display: flex;
   flex-wrap: wrap;
@@ -327,7 +317,7 @@ h1 {
 .constellation-layout {
   position: relative;
   grid-template-columns: 1fr !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
   gap: 0 !important;
   flex: 1;
   min-height: 0;
@@ -646,18 +636,25 @@ h1 {
   bottom: calc(12px + var(--nav-block));
 }
 
-/* Студия на телефоне: вкладки сверху, полотно — до нижней навигации. */
+/* Студия на телефоне: полотно на весь экран, вкладки внизу. */
 .studio-view.is-on {
-  padding: 12px 12px 0 !important;
+  padding: 12px 12px 10px !important;
   height: 100%;
   box-sizing: border-box;
 }
 
+/* Панель вкладок на телефоне — во всю ширину; в «Архиве» шесть вкладок, шрифт мельче. */
+.tab-bar,
 .settings-tabs,
 .studio-tabs {
-  max-width: none;
+  width: 100%;
 }
 
-.settings-view.is-on {
-  overflow-y: auto !important;
+.archive-tabs button {
+  font-size: 12px;
+}
+
+.archive-view .fab,
+.wishlist-view .fab {
+  bottom: 62px;
 }
