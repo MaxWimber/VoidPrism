@@ -1450,21 +1450,63 @@ body:not(.is-mobile-app) .dossier-fab { display: none; }
 
 .cal-sort[hidden] { display: none; }
 
+/* Период: стрелки и заголовок по центру, «Сегодня» справа. */
 .cal-period {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex: 1 1 360px;
   margin-left: auto;
   min-width: 0;
 }
 
 .cal-period [hidden] { display: none; }
 
+.cal-period-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-period-end {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cal-arrow {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+}
+
+.cal-arrow.is-next svg {
+  transform: rotate(180deg);
+}
+
 .cal-title {
+  min-width: 0;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
   font-family: var(--display);
   font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.03em;
+  text-align: center;
   text-transform: capitalize;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.cal-title.is-zoomable {
+  cursor: pointer;
+}
+
+.cal-title.is-zoomable:hover {
+  background: rgba(126, 231, 255, 0.08);
 }
 
 .cal-board[hidden],
@@ -2549,4 +2591,95 @@ body.is-selecting .fab { display: none; }
 .cal-panel-card,
 .entry-row {
   -webkit-touch-callout: none;
+}
+
+/* Месяц: сетки месяцев и лет по тапу на заголовок. */
+.cal-zoom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px;
+  height: 100%;
+}
+
+.cal-zoom-cell {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.cal-zoom-cell.is-today {
+  color: var(--cyan);
+}
+
+.cal-zoom-cell.is-selected {
+  background: rgba(126, 231, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 255, 0.4);
+}
+
+/* Неделя: в часе с записями — кубики по одной на запись, без названий. */
+.cal-hour-cell {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(126, 231, 255, 0.06);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.cal-hour-cell:hover {
+  background: rgba(126, 231, 255, 0.12);
+}
+
+.cal-cubes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.cal-cube {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.cal-cube.tone-amber { color: var(--amber); }
+.cal-cube.tone-mint { color: var(--mint); }
+.cal-cube.tone-cyan { color: var(--cyan); }
+
+.cal-cube-more {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.cal-allday-col {
+  cursor: pointer;
+}
+
+.cal-allday-col .cal-cubes {
+  padding: 6px 0;
+}
+
+/* День: фильтр по часам. */
+.cal-hour-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
 }

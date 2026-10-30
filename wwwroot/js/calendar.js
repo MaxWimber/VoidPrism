@@ -14,9 +14,11 @@ import {
 } from "./ui.js";
 
 const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-const HOUR_START = 6;
-const HOUR_END = 22;
+const HOUR_START = 0;
+const HOUR_END = 24;
 const HOUR_PX = 44;
+const MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+const MAX_CUBES = 9;
 
 const MODES = [
   ["plan", "План"],
@@ -42,6 +44,11 @@ let cursor = startOfDay(Date.now());
 let selectedDay = dayKey(Date.now());
 // Откуда пришли в «День» тапом по дню месяца/недели — туда вернёт системный «назад».
 let dayFrom = null;
+// «Месяц» по тапу на заголовок показывает сетку дней → месяцев → лет.
+let zoom = "days";
+// «День» можно сузить до одного часа (тап по кубикам часа в «Неделе» или чип часа).
+let hourFilter = null;
+let lastView = null;
 
 function kindLabel(kind) {
   if (kind === "task") return "Задача";
@@ -177,6 +184,8 @@ function showsToday() {
   if (view === "week") return mondayOf(cursor) === mondayOf(today);
   const a = new Date(cursor);
   const b = new Date(today);
+  if (zoom === "years") return Math.floor(a.getFullYear() / 12) === Math.floor(b.getFullYear() / 12);
+  if (zoom === "months") return a.getFullYear() === b.getFullYear();
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
@@ -193,10 +202,15 @@ function paintChrome() {
   sort.hidden = mode !== "journal";
   sort.innerHTML = `<span aria-hidden="true">⇅</span> ${journalField === "createdAt" ? "по созданию" : "по изменению"}`;
   root.querySelector("[data-today]").hidden = showsToday();
+  titleEl.classList.toggle("is-zoomable", view === "month");
   if (view === "day") {
     titleEl.textContent = formatDayTitle(cursor);
   } else if (view === "month") {
-    titleEl.textContent = formatMonthTitle(cursor);
+    const year = new Date(cursor).getFullYear();
+    const first = year - (year % 12);
+    if (zoom === "months") titleEl.textContent = String(year);
+    else if (zoom === "years") titleEl.textContent = `${first} – ${first + 11}`;
+    else titleEl.textContent = formatMonthTitle(cursor);
   } else {
     const start = mondayOf(cursor);
     const end = addDays(start, 6);
@@ -207,17 +221,40 @@ function paintChrome() {
   }
 }
 
-function itemChip(entry, { compact = false } = {}) {
-  const tone = kindTone(entry.kind);
-  const time = mode === "journal" ? "" : formatTime(entry._stamp ?? entry.when);
-  return `
-    <button type="button" class="cal-item tone-${tone}" data-id="${esc(entry.id)}" title="${esc(entry.title)}">
-      ${!compact && time ? `<span class="cal-item-time">${esc(time)}</span>` : ""}
-      <span class="cal-item-title">${esc(short(entry.title, compact ? 14 : 28))}</span>
-    </button>`;
+function paintMonthPicker() {
+  const date = new Date(cursor);
+  const year = date.getFullYear();
+  const now = new Date();
+  const cells = MONTHS.map((name, index) => {
+    const on = index === date.getMonth() ? " is-selected" : "";
+    const today = year === now.getFullYear() && index === now.getMonth() ? " is-today" : "";
+    return `<button type="button" class="cal-zoom-cell${on}${today}" data-pick-month="${index}">${name}</button>`;
+  });
+  boardEl.innerHTML = `<div class="cal-zoom">${cells.join("")}</div>`;
+}
+
+function paintYearPicker() {
+  const year = new Date(cursor).getFullYear();
+  const first = year - (year % 12);
+  const now = new Date().getFullYear();
+  const cells = Array.from({ length: 12 }, (_, index) => {
+    const value = first + index;
+    const on = value === year ? " is-selected" : "";
+    const today = value === now ? " is-today" : "";
+    return `<button type="button" class="cal-zoom-cell${on}${today}" data-pick-year="${value}">${value}</button>`;
+  });
+  boardEl.innerHTML = `<div class="cal-zoom">${cells.join("")}</div>`;
 }
 
 function paintMonth(map) {
+  if (zoom === "months") {
+    paintMonthPicker();
+    return;
+  }
+  if (zoom === "years") {
+    paintYearPicker();
+    return;
+  }
   const cells = monthCells(cursor);
   const head = WEEKDAYS.map((name) => `<div class="cal-weekday">${name}</div>`).join("");
   const body = cells.map((cell) => {
@@ -237,7 +274,7 @@ function paintMonth(map) {
           ${items.length ? `<span class="cal-count">${items.length}</span>` : ""}
         </div>
         <div class="cal-cell-items">
-          ${shown.map((entry) => itemChip(entry, { compact: true })).join("")}
+          ${shown.map((entry) => `<span class="cal-item tone-${kindTone(entry.kind)}"><span class="cal-item-title">${esc(short(entry.title, 14))}</span></span>`).join("")}
           ${more > 0 ? `<span class="cal-more">+${more}</span>` : ""}
         </div>
       </div>`;
@@ -249,6 +286,12 @@ function paintMonth(map) {
     </div>`;
 }
 
+function cubes(entries) {
+  const shown = entries.slice(0, MAX_CUBES);
+  const more = entries.length - shown.length;
+  return `${shown.map((entry) => `<i class="cal-cube tone-${kindTone(entry.kind)}" title="${esc(entry.title)}"></i>`).join("")}${more > 0 ? `<b class="cal-cube-more">+${more}</b>` : ""}`;
+}
+
 function paintWeek(map) {
   const days = weekDays(cursor);
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
@@ -257,31 +300,28 @@ function paintWeek(map) {
     const items = (map.get(day.key) || []).filter((entry) => !hasClockTime(entry._stamp));
     return `
       <div class="cal-allday-col ${day.isToday ? "is-today" : ""} ${day.key === selectedDay ? "is-selected" : ""}" data-day="${esc(day.key)}">
-        ${items.map((entry) => itemChip(entry, { compact: true })).join("") || `<span class="cal-allday-empty">—</span>`}
+        ${items.length ? `<span class="cal-cubes">${cubes(items)}</span>` : ""}
       </div>`;
   }).join("");
   const timedCols = days.map((day) => {
-    const timed = (map.get(day.key) || []).filter((entry) => hasClockTime(entry._stamp));
-    const blocks = timed.map((entry) => {
-      const date = new Date(entry._stamp);
-      const minutes = date.getHours() * 60 + date.getMinutes();
-      const startMin = HOUR_START * 60;
-      const endMin = HOUR_END * 60;
-      const clamped = Math.min(endMin - 30, Math.max(startMin, minutes));
-      const top = ((clamped - startMin) / 60) * HOUR_PX;
-      return `
-        <button type="button" class="cal-block tone-${kindTone(entry.kind)}" data-id="${esc(entry.id)}" style="top:${top}px">
-          <strong>${esc(formatTime(entry._stamp))}</strong>
-          <span>${esc(short(entry.title, 20))}</span>
-        </button>`;
-    }).join("");
+    const byHour = new Map();
+    for (const entry of (map.get(day.key) || []).filter((item) => hasClockTime(item._stamp))) {
+      const hour = new Date(entry._stamp).getHours();
+      if (!byHour.has(hour)) byHour.set(hour, []);
+      byHour.get(hour).push(entry);
+    }
+    // Час с записями — кубики (по одному на запись); тап открывает «День» на этот час.
+    const cells = [...byHour].map(([hour, items]) => `
+      <button type="button" class="cal-hour-cell" data-day="${esc(day.key)}" data-hour-cell="${hour}" style="top:${(hour - HOUR_START) * HOUR_PX}px; height:${HOUR_PX}px" aria-label="${items.length} в ${String(hour).padStart(2, "0")}:00">
+        <span class="cal-cubes">${cubes(items)}</span>
+      </button>`).join("");
     const slots = hours.map((hour) => `
       <button type="button" class="cal-slot" data-day="${esc(day.key)}" data-hour="${hour}" style="height:${HOUR_PX}px" aria-label="${esc(day.key)} ${hour}:00"></button>
     `).join("");
     return `
       <div class="cal-day-col ${day.isToday ? "is-today" : ""} ${day.key === selectedDay ? "is-selected" : ""}" data-day="${esc(day.key)}" style="height:${height}px">
         <div class="cal-slots">${slots}</div>
-        <div class="cal-blocks">${blocks}</div>
+        <div class="cal-blocks">${cells}</div>
       </div>`;
   }).join("");
   const hourLabels = hours.map((hour) => `
@@ -309,9 +349,28 @@ function paintWeek(map) {
     </div>`;
 }
 
+function hourLabel(hour) {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
 function paintPanel(map) {
-  const items = map.get(selectedDay) || [];
+  const all = map.get(selectedDay) || [];
+  const hours = [...new Set(all.filter((entry) => hasClockTime(entry._stamp)).map((entry) => new Date(entry._stamp).getHours()))];
+  if (hourFilter != null && !hours.includes(hourFilter)) hours.push(hourFilter);
+  hours.sort((a, b) => a - b);
+  const items = hourFilter == null
+    ? all
+    : all.filter((entry) => hasClockTime(entry._stamp) && new Date(entry._stamp).getHours() === hourFilter);
+  const chips = hours.length ? `
+    <div class="chip-row cal-hour-chips">
+      <button type="button" class="chip ${hourFilter == null ? "is-on" : ""}" data-hour-filter="">Все</button>
+      ${hours.map((hour) => `<button type="button" class="chip ${hourFilter === hour ? "is-on" : ""}" data-hour-filter="${hour}">${hourLabel(hour)}</button>`).join("")}
+    </div>` : "";
+  const empty = hourFilter == null
+    ? "Плюсик внизу добавит запись на этот день."
+    : `В ${hourLabel(hourFilter)} пусто — плюсик добавит запись на этот час.`;
   panelEl.innerHTML = `
+    ${chips}
     <div class="cal-panel-list">
       ${items.length ? items.map((entry) => `
         <article class="cal-panel-card tone-${kindTone(entry.kind)}" data-id="${esc(entry.id)}">
@@ -322,7 +381,7 @@ function paintPanel(map) {
           <h3>${esc(entry.title)}</h3>
           ${entry.tags?.length ? `<div class="card-tags">${entry.tags.map((tag) => `<span class="mini-tag">#${esc(tag)}</span>`).join("")}</div>` : ""}
         </article>
-      `).join("") : `<div class="empty slim"><strong>Тишина</strong><span>Плюсик внизу добавит запись на этот день.</span></div>`}
+      `).join("") : `<div class="empty slim"><strong>Тишина</strong><span>${esc(empty)}</span></div>`}
     </div>`;
 }
 
@@ -341,12 +400,16 @@ export function render() {
   else boardEl.innerHTML = "";
   if (view === "day") paintPanel(map);
   else panelEl.innerHTML = "";
+  // Неделя теперь на все 24 часа — при открытии прокручиваем к утру, а не к полуночи.
+  if (view === "week" && lastView !== "week") boardEl.scrollTop = 7 * HOUR_PX;
+  lastView = view;
 }
 
-function goToDay(key, from = view) {
+function goToDay(key, from = view, hour = null) {
   const ts = parseDayKey(key);
   if (ts == null) return;
   dayFrom = from === "day" ? dayFrom : from;
+  hourFilter = hour;
   view = "day";
   cursor = startOfDay(ts);
   selectedDay = key;
@@ -358,10 +421,13 @@ function shift(step) {
   if (view === "month") {
     const date = new Date(cursor);
     date.setDate(1);
-    date.setMonth(date.getMonth() + step);
+    if (zoom === "years") date.setFullYear(date.getFullYear() + step * 12);
+    else if (zoom === "months") date.setFullYear(date.getFullYear() + step);
+    else date.setMonth(date.getMonth() + step);
     cursor = startOfDay(date.getTime());
   } else if (view === "day") {
     cursor = addDays(cursor, step);
+    hourFilter = null;
   } else {
     cursor = addDays(mondayOf(cursor), step * 7);
   }
@@ -374,6 +440,7 @@ export function openDay(ts) {
   mode = "plan";
   view = "day";
   dayFrom = null;
+  hourFilter = null;
   cursor = startOfDay(ts || Date.now());
   selectedDay = dayKey(cursor);
   if (active) render();
@@ -384,6 +451,7 @@ export function handleBack() {
   if (!active || view !== "day" || !dayFrom) return false;
   view = dayFrom;
   dayFrom = null;
+  hourFilter = null;
   render();
   return true;
 }
@@ -525,8 +593,15 @@ export function mount(parent) {
         <button type="button" class="chip cal-sort" data-journal-toggle hidden></button>
       </div>
       <div class="cal-period">
-        <strong class="cal-title"></strong>
-        <button type="button" class="chip" data-today hidden>Сегодня</button>
+        <span></span>
+        <div class="cal-period-nav">
+          <button type="button" class="icon-btn cal-arrow" data-step="-1" aria-label="Предыдущий период">${icons.back}</button>
+          <button type="button" class="cal-title" data-zoom-title></button>
+          <button type="button" class="icon-btn cal-arrow is-next" data-step="1" aria-label="Следующий период">${icons.back}</button>
+        </div>
+        <div class="cal-period-end">
+          <button type="button" class="chip" data-today hidden>Сегодня</button>
+        </div>
       </div>
     </div>
     <div class="cal-layout">
@@ -551,6 +626,8 @@ export function mount(parent) {
     if (!next || next === view) return;
     view = next;
     dayFrom = null;
+    hourFilter = null;
+    zoom = "days";
     if (view === "day") cursor = startOfDay(parseDayKey(selectedDay) ?? Date.now());
     render();
   });
@@ -561,17 +638,51 @@ export function mount(parent) {
   root.querySelector("[data-today]").addEventListener("click", () => {
     cursor = startOfDay(Date.now());
     selectedDay = dayKey(cursor);
+    zoom = "days";
+    hourFilter = null;
     render();
   });
-  root.querySelector("[data-new]").addEventListener("click", () => createForDay(selectedDay));
+  root.querySelector(".cal-period-nav").addEventListener("click", (event) => {
+    const step = event.target.closest("[data-step]")?.dataset.step;
+    if (step) {
+      slideTo(Number(step));
+      return;
+    }
+    // Заголовок месяца: дни → месяцы → годы → снова дни.
+    if (event.target.closest("[data-zoom-title]") && view === "month") {
+      zoom = zoom === "days" ? "months" : zoom === "months" ? "years" : "days";
+      render();
+    }
+  });
+  root.querySelector("[data-new]").addEventListener("click", () => createForDay(selectedDay, view === "day" ? hourFilter : null));
 
   const layout = root.querySelector(".cal-layout");
   bindSwipes(layout);
 
   boardEl.addEventListener("click", (event) => {
-    const item = event.target.closest("[data-id]");
-    if (item) {
-      openEntry(item.dataset.id);
+    const month = event.target.closest("[data-pick-month]")?.dataset.pickMonth;
+    if (month != null) {
+      const date = new Date(cursor);
+      date.setDate(1);
+      date.setMonth(Number(month));
+      cursor = startOfDay(date.getTime());
+      zoom = "days";
+      render();
+      return;
+    }
+    const year = event.target.closest("[data-pick-year]")?.dataset.pickYear;
+    if (year != null) {
+      const date = new Date(cursor);
+      date.setDate(1);
+      date.setFullYear(Number(year));
+      cursor = startOfDay(date.getTime());
+      zoom = "months";
+      render();
+      return;
+    }
+    const hourCell = event.target.closest("[data-hour-cell]");
+    if (hourCell) {
+      goToDay(hourCell.dataset.day, view, Number(hourCell.dataset.hourCell));
       return;
     }
     const slot = event.target.closest(".cal-slot");
@@ -586,6 +697,12 @@ export function mount(parent) {
   });
 
   panelEl.addEventListener("click", (event) => {
+    const filter = event.target.closest("[data-hour-filter]");
+    if (filter) {
+      hourFilter = filter.dataset.hourFilter === "" ? null : Number(filter.dataset.hourFilter);
+      render();
+      return;
+    }
     const id = event.target.closest("[data-id]")?.dataset.id;
     if (id) openEntry(id);
   });

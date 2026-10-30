@@ -1179,6 +1179,7 @@ function initWhen() {
     hour: base.getHours(),
     minute: has ? base.getMinutes() : 0,
     drag: "",
+    zoom: "days",
   };
   paintWhenPicker();
 }
@@ -1190,12 +1191,47 @@ function openSettings(focus) {
   if (focus === "date") drawerEl.querySelector(".when-block")?.scrollIntoView({ block: "start" });
 }
 
+const MONTH_NAMES = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+
+/** Сетка месяцев или лет вместо дней — по тапу на заголовок (дни → месяцы → годы → дни). */
+function paintZoom(cursor) {
+  const grid = drawerEl.querySelector(".when-grid");
+  const year = cursor.getFullYear();
+  const now = new Date();
+  const picked = whenPick.day != null ? new Date(whenPick.day) : null;
+  let cells;
+  if (whenPick.zoom === "months") {
+    cells = MONTH_NAMES.map((name, index) => {
+      const on = picked && picked.getFullYear() === year && picked.getMonth() === index ? " is-on" : "";
+      const today = now.getFullYear() === year && now.getMonth() === index ? " is-today" : "";
+      return `<button type="button" class="when-zoom-cell${on}${today}" data-pick-month="${index}">${name}</button>`;
+    });
+  } else {
+    const first = year - (year % 12);
+    cells = Array.from({ length: 12 }, (_, index) => {
+      const value = first + index;
+      const on = picked && picked.getFullYear() === value ? " is-on" : "";
+      const today = now.getFullYear() === value ? " is-today" : "";
+      return `<button type="button" class="when-zoom-cell${on}${today}" data-pick-year="${value}">${value}</button>`;
+    });
+  }
+  grid.innerHTML = cells.join("");
+}
+
 function paintMonth() {
   const cursor = new Date(whenPick.cursor);
-  drawerEl.querySelector("[data-month-title]").textContent = new Intl.DateTimeFormat("ru-RU", {
-    month: "long",
-    year: "numeric",
-  }).format(cursor);
+  const zoomed = whenPick.zoom !== "days";
+  const title = drawerEl.querySelector("[data-month-title]");
+  const year = cursor.getFullYear();
+  if (whenPick.zoom === "months") title.textContent = String(year);
+  else if (whenPick.zoom === "years") title.textContent = `${year - (year % 12)} – ${year - (year % 12) + 11}`;
+  else title.textContent = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(cursor);
+  drawerEl.querySelector(".when-week").hidden = zoomed;
+  drawerEl.querySelector(".when-grid").classList.toggle("is-zoom", zoomed);
+  if (zoomed) {
+    paintZoom(cursor);
+    return;
+  }
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const start = new Date(first);
   start.setDate(1 - ((first.getDay() + 6) % 7));
@@ -1389,11 +1425,35 @@ function bindWhenPicker() {
       paintMonth();
       return;
     }
+    if (event.target.closest("[data-month-title]")) {
+      whenPick.zoom = whenPick.zoom === "days" ? "months" : whenPick.zoom === "months" ? "years" : "days";
+      paintMonth();
+      return;
+    }
     const shift = event.target.closest("[data-month]")?.dataset.month;
     if (shift) {
+      // Стрелки листают то, что сейчас видно: месяц, год или двенадцать лет.
       const date = new Date(whenPick.cursor);
-      date.setMonth(date.getMonth() + Number(shift));
+      if (whenPick.zoom === "years") date.setFullYear(date.getFullYear() + Number(shift) * 12);
+      else if (whenPick.zoom === "months") date.setFullYear(date.getFullYear() + Number(shift));
+      else date.setMonth(date.getMonth() + Number(shift));
       whenPick.cursor = date.getTime();
+      paintMonth();
+      return;
+    }
+    const pickMonth = event.target.closest("[data-pick-month]")?.dataset.pickMonth;
+    if (pickMonth != null) {
+      const date = new Date(whenPick.cursor);
+      whenPick.cursor = new Date(date.getFullYear(), Number(pickMonth), 1).getTime();
+      whenPick.zoom = "days";
+      paintMonth();
+      return;
+    }
+    const pickYear = event.target.closest("[data-pick-year]")?.dataset.pickYear;
+    if (pickYear != null) {
+      const date = new Date(whenPick.cursor);
+      whenPick.cursor = new Date(Number(pickYear), date.getMonth(), 1).getTime();
+      whenPick.zoom = "months";
       paintMonth();
       return;
     }
@@ -1831,7 +1891,7 @@ export function mount(parent) {
         <div class="when-block" hidden>
           <div class="when-month">
             <button type="button" class="date-plain" data-month="-1" aria-label="Предыдущий месяц">‹</button>
-            <span data-month-title></span>
+            <button type="button" class="date-plain when-title" data-month-title aria-label="Выбрать месяц и год"></button>
             <button type="button" class="date-plain" data-month="1" aria-label="Следующий месяц">›</button>
           </div>
           <div class="when-week">${["пн","вт","ср","чт","пт","сб","вс"].map((day) => `<span>${day}</span>`).join("")}</div>

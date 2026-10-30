@@ -228,9 +228,9 @@ h1 {
 }
 
 .cal-period {
+  flex: none;
   margin-left: 0;
-  justify-content: space-between;
-  min-height: 32px;
+  min-height: 34px;
 }
 
 .cal-title {
